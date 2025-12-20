@@ -21,12 +21,12 @@ class BackupService {
        _preferencesService = preferencesService;
 
   static const List<String> _driveScopes = [
+    'email', // Required for sign in
     'https://www.googleapis.com/auth/drive.file',
     'https://www.googleapis.com/auth/drive.appdata',
   ];
 
   // Server Client ID from Google Cloud Console (Web application type)
-  // This is required on Android to get the auth headers for drive access
   static const String _serverClientId =
       '407290386438-orjbo225jeco7cknlq5l2ov43iurthpq.apps.googleusercontent.com';
 
@@ -52,9 +52,10 @@ class BackupService {
         }
       });
 
-      // 3. Try silent sign-in
+      // 3. Try silent sign-in (now attemptLightweightAuthentication)
       final result = await GoogleSignIn.instance
           .attemptLightweightAuthentication();
+
       if (result != null) {
         _currentUser = result;
         await _preferencesService.setGoogleAccountEmail(result.email);
@@ -66,7 +67,7 @@ class BackupService {
     _isInitialized = true;
   }
 
-  /// Sign in with Google
+  /// Sign in with Google (Interactive)
   Future<void> signIn() async {
     // Ensure initialized
     if (!_isInitialized) {
@@ -196,16 +197,45 @@ class BackupService {
     }
   }
 
-  /// Helper to get authenticated HTTP client
+  /// Helper to get authenticated HTTP client (New v7.2.0 API)
   Future<AuthClient> _getAuthClient() async {
     if (_currentUser == null) throw Exception('No user');
 
-    // Retrieve the authorization tokens from the current user.
+    // Retrieve the authorization tokens from the current user using AuthorizationClient
     final authClient = _currentUser!.authorizationClient;
-    final headers = await authClient.authorizationHeaders(_driveScopes);
+
+    // DEBUG LOGGING
+    print('DEBUG: Requesting headers for scopes: $_driveScopes');
+    print('DEBUG: Current User ID: ${_currentUser!.id}');
+    print('DEBUG: Current User Email: ${_currentUser!.email}');
+
+    // Try to get headers, prompting if necessary (IMPORTANT for new users)
+    // We explicitly set promptIfNecessary: true to handle cases where
+    // scopeHint in authenticate() wasn't enough.
+    Map<String, String>? headers = await authClient.authorizationHeaders(
+      _driveScopes,
+      promptIfNecessary: true,
+    );
+
+    // If still null, try one last force authorization
+    if (headers == null) {
+      print('DEBUG: Headers null, attempting explicit authorizeScopes...');
+      try {
+        await authClient.authorizeScopes(_driveScopes);
+        headers = await authClient.authorizationHeaders(_driveScopes);
+      } catch (e) {
+        print('DEBUG: Explicit authorization failed: $e');
+      }
+    }
 
     if (headers == null) {
-      throw Exception('Failed to get authorization headers');
+      print('DEBUG: Authorization headers returned NULL.');
+      // This often happens if the SHA-1 is missing in Console or scopes were rejected.
+      throw Exception(
+        'Failed to get authorization headers. Check SHA-1/Scopes.',
+      );
+    } else {
+      print('DEBUG: Headers obtained successfully: ${headers.keys}');
     }
 
     return AuthClient(headers);
