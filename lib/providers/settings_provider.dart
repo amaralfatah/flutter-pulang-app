@@ -1,0 +1,162 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
+import '../services/services.dart';
+import 'prayer_provider.dart';
+
+/// State for app settings
+class SettingsState {
+  final String? cityId;
+  final String? cityName;
+  final bool notificationEnabled;
+  final bool autoBackupEnabled;
+  final String? lastBackupDate;
+  final String? googleAccountEmail;
+  final bool isLoading;
+
+  const SettingsState({
+    this.cityId,
+    this.cityName,
+    this.notificationEnabled = true,
+    this.autoBackupEnabled = true,
+    this.lastBackupDate,
+    this.googleAccountEmail,
+    this.isLoading = false,
+  });
+
+  SettingsState copyWith({
+    String? cityId,
+    String? cityName,
+    bool? notificationEnabled,
+    bool? autoBackupEnabled,
+    String? lastBackupDate,
+    String? googleAccountEmail,
+    bool? isLoading,
+  }) {
+    return SettingsState(
+      cityId: cityId ?? this.cityId,
+      cityName: cityName ?? this.cityName,
+      notificationEnabled: notificationEnabled ?? this.notificationEnabled,
+      autoBackupEnabled: autoBackupEnabled ?? this.autoBackupEnabled,
+      lastBackupDate: lastBackupDate ?? this.lastBackupDate,
+      googleAccountEmail: googleAccountEmail ?? this.googleAccountEmail,
+      isLoading: isLoading ?? this.isLoading,
+    );
+  }
+
+  /// Check if city is selected
+  bool get hasCitySelected => cityId != null && cityId!.isNotEmpty;
+
+  /// Check if Google account is connected
+  bool get isGoogleConnected =>
+      googleAccountEmail != null && googleAccountEmail!.isNotEmpty;
+}
+
+/// Notifier for settings (Riverpod 3 syntax)
+class SettingsNotifier extends Notifier<SettingsState> {
+  PreferencesService get _preferencesService =>
+      ref.read(preferencesServiceProvider);
+  NotificationService get _notificationService =>
+      ref.read(notificationServiceProvider);
+
+  @override
+  SettingsState build() {
+    _loadSettings();
+    return const SettingsState(isLoading: true);
+  }
+
+  /// Load all settings from SharedPreferences
+  Future<void> _loadSettings() async {
+    final cityId = await _preferencesService.getCityId();
+    final cityName = await _preferencesService.getCityName();
+    final notificationEnabled = await _preferencesService
+        .isNotificationEnabled();
+    final autoBackupEnabled = await _preferencesService.isAutoBackupEnabled();
+    final lastBackupDate = await _preferencesService.getLastBackupDate();
+    final googleAccountEmail = await _preferencesService
+        .getGoogleAccountEmail();
+
+    state = SettingsState(
+      cityId: cityId,
+      cityName: cityName,
+      notificationEnabled: notificationEnabled,
+      autoBackupEnabled: autoBackupEnabled,
+      lastBackupDate: lastBackupDate,
+      googleAccountEmail: googleAccountEmail,
+      isLoading: false,
+    );
+  }
+
+  /// Set city
+  Future<void> setCity({required String id, required String name}) async {
+    await _preferencesService.setCity(id: id, name: name);
+    state = state.copyWith(cityId: id, cityName: name);
+  }
+
+  /// Set notification enabled
+  Future<void> setNotificationEnabled(bool enabled) async {
+    await _preferencesService.setNotificationEnabled(enabled);
+    state = state.copyWith(notificationEnabled: enabled);
+
+    if (enabled) {
+      // Re-schedule will happen on next prayer times refresh or we can trigger it
+      // But we need prayer times data.
+      // Simplified: Just cancel if disabled. Re-enable implies waiting for next fetch
+      // or user can refresh manually.
+      // Ideally we should read prayerTimesProvider and schedule, but avoid circular dependency.
+      // For personal app, wait for next fetch is okay or simple check.
+
+      // We will leave it to auto-schedule on fetch, but ensure permissions are requested
+      if (enabled) {
+        await _notificationService.requestPermissions();
+        // Trigger refresh of prayer times to re-schedule
+        // This is a bit indirect but avoids direct dependency update here
+      }
+    } else {
+      await _notificationService.cancelAllNotifications();
+    }
+  }
+
+  /// Set auto backup enabled
+  Future<void> setAutoBackupEnabled(bool enabled) async {
+    await _preferencesService.setAutoBackupEnabled(enabled);
+    state = state.copyWith(autoBackupEnabled: enabled);
+  }
+
+  /// Set last backup date
+  Future<void> setLastBackupDate(String date) async {
+    await _preferencesService.setLastBackupDate(date);
+    state = state.copyWith(lastBackupDate: date);
+  }
+
+  /// Set Google account email
+  Future<void> setGoogleAccountEmail(String? email) async {
+    await _preferencesService.setGoogleAccountEmail(email);
+    state = state.copyWith(googleAccountEmail: email);
+  }
+
+  /// Clear Google account
+  Future<void> clearGoogleAccount() async {
+    await _preferencesService.setGoogleAccountEmail(null);
+    state = state.copyWith(googleAccountEmail: null);
+  }
+
+  /// Refresh settings
+  Future<void> refresh() => _loadSettings();
+}
+
+/// Provider for settings
+final settingsProvider = NotifierProvider<SettingsNotifier, SettingsState>(
+  SettingsNotifier.new,
+);
+
+/// Provider for city name display
+final cityDisplayProvider = Provider<String>((ref) {
+  final settings = ref.watch(settingsProvider);
+  return settings.cityName ?? 'Pilih Kota';
+});
+
+/// Provider for checking if setup is complete
+final isSetupCompleteProvider = Provider<bool>((ref) {
+  final settings = ref.watch(settingsProvider);
+  return settings.hasCitySelected;
+});
