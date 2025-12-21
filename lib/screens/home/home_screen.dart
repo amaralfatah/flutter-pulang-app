@@ -2,13 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
-import '../../app/theme/app_colors.dart';
-import '../../app/theme/app_theme.dart';
 import '../../models/models.dart';
 import '../../providers/providers.dart';
 import '../../widgets/home/prayer_timer_card.dart';
 import '../../widgets/shared/prayer_card.dart';
-import '../../widgets/shared/check_in_option.dart';
+import '../../widgets/shared/check_in_bottom_sheet.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -26,18 +24,18 @@ class HomeScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Pulang'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh_rounded),
-            onPressed: () {
-              prayerTimesNotifier.refresh();
-              todayPrayersNotifier.refresh();
-            },
-          ),
-        ],
+        // actions: [
+        //   IconButton(
+        //     icon: const Icon(Icons.refresh_rounded),
+        //     onPressed: () {
+        //       prayerTimesNotifier.refresh();
+        //       todayPrayersNotifier.refresh();
+        //     },
+        //   ),
+        // ],
       ),
       body: RefreshIndicator(
-        color: AppColors.primary,
+        color: Theme.of(context).colorScheme.primary,
         onRefresh: () async {
           await prayerTimesNotifier.refresh();
           await todayPrayersNotifier.refresh();
@@ -64,7 +62,6 @@ class HomeScreen extends ConsumerWidget {
                     'Jadwal Hari Ini',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
                     ),
                   ),
                   const Spacer(),
@@ -75,15 +72,14 @@ class HomeScreen extends ConsumerWidget {
                       vertical: 6,
                     ),
                     decoration: BoxDecoration(
-                      color: AppColors.primary.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(16),
+                      color: Theme.of(context).colorScheme.primaryContainer,
+                      borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
                       '${todayPrayersState.completedCount}/5',
-                      style: const TextStyle(
-                        color: AppColors.primary,
+                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                        color: Theme.of(context).colorScheme.onPrimaryContainer,
                         fontWeight: FontWeight.bold,
-                        fontSize: 13,
                       ),
                     ),
                   ),
@@ -95,7 +91,7 @@ class HomeScreen extends ConsumerWidget {
 
             // Prayer List
             if (prayerTimesState.prayerTime == null)
-              _buildEmptyState()
+              _buildEmptyState(context)
             else
               ..._buildPrayerList(
                 context,
@@ -130,7 +126,7 @@ class HomeScreen extends ConsumerWidget {
                   children: [
                     Icon(
                       Icons.location_on_rounded,
-                      color: AppColors.primary,
+                      color: Theme.of(context).colorScheme.primary,
                       size: 18,
                     ),
                     const SizedBox(width: 6),
@@ -138,10 +134,7 @@ class HomeScreen extends ConsumerWidget {
                       child: Text(
                         settings.cityName ?? 'Pilih Kota',
                         style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
-                            ),
+                            ?.copyWith(fontWeight: FontWeight.bold),
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
@@ -152,7 +145,7 @@ class HomeScreen extends ConsumerWidget {
                 Text(
                   dateStr,
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: AppColors.textSecondary,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -163,7 +156,8 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       height: 200,
       alignment: Alignment.center,
@@ -173,17 +167,21 @@ class HomeScreen extends ConsumerWidget {
           Icon(
             Icons.location_off_outlined,
             size: 64,
-            color: AppColors.textSecondary.withOpacity(0.4),
+            color: colorScheme.outlineVariant,
           ),
           const SizedBox(height: 12),
-          const Text(
+          Text(
             'Jadwal solat tidak tersedia',
-            style: TextStyle(color: AppColors.textSecondary),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 4),
-          const Text(
+          Text(
             'Pilih kota di Pengaturan',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),
@@ -235,94 +233,15 @@ class HomeScreen extends ConsumerWidget {
     String time,
     Prayer? existingRecord,
   ) async {
-    final isEdit = existingRecord != null;
-    final displayName =
-        name.value.substring(0, 1).toUpperCase() + name.value.substring(1);
-
-    await showModalBottomSheet(
+    await CheckInBottomSheet.show(
       context: context,
-      backgroundColor: AppColors.surface,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-          top: Radius.circular(AppTheme.bottomSheetRadius),
-        ),
-      ),
-      builder: (context) => SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: AppColors.divider,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              isEdit ? 'Edit $displayName' : 'Check-in $displayName',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: AppColors.textPrimary,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 24),
-            CheckInOption(
-              icon: Icons.check_circle_rounded,
-              color: AppColors.success,
-              title: 'Tepat Waktu',
-              subtitle: 'Solat dilakukan di awal waktu',
-              isSelected: existingRecord?.status == PrayerStatus.onTime,
-              onTap: () {
-                Navigator.pop(context);
-                _checkIn(ref, name, PrayerStatus.onTime);
-              },
-            ),
-            const SizedBox(height: 12),
-            CheckInOption(
-              icon: Icons.schedule_rounded,
-              color: AppColors.warning,
-              title: 'Terlambat / Qadha',
-              subtitle: 'Solat dilakukan setelah waktu ideal',
-              isSelected: existingRecord?.status == PrayerStatus.late,
-              onTap: () {
-                Navigator.pop(context);
-                _checkIn(ref, name, PrayerStatus.late);
-              },
-            ),
-            const SizedBox(height: 12),
-            CheckInOption(
-              icon: Icons.cancel_rounded,
-              color: AppColors.error,
-              title: 'Terlewat',
-              subtitle: 'Tidak solat',
-              isSelected: existingRecord?.status == PrayerStatus.missed,
-              onTap: () {
-                Navigator.pop(context);
-                _checkIn(ref, name, PrayerStatus.missed);
-              },
-            ),
-            const SizedBox(height: 24),
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text(
-                'Batal',
-                style: TextStyle(color: AppColors.textSecondary),
-              ),
-            ),
-            const SizedBox(height: 8),
-          ],
-        ),
-      ),
+      prayerName: name,
+      currentStatus: existingRecord?.status,
+      onStatusSelected: (status) {
+        ref
+            .read(todayPrayersProvider.notifier)
+            .checkIn(prayerName: name, status: status);
+      },
     );
-  }
-
-  void _checkIn(WidgetRef ref, PrayerName name, PrayerStatus status) {
-    ref
-        .read(todayPrayersProvider.notifier)
-        .checkIn(prayerName: name, status: status);
   }
 }

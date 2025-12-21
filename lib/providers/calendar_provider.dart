@@ -109,8 +109,26 @@ class CalendarNotifier extends Notifier<CalendarState> {
   @override
   CalendarState build() {
     final now = DateTime.now();
-    _loadMonthPrayerStatus(now.year, now.month);
-    return CalendarState(focusedDay: now, isLoading: true);
+    // Auto-select today on initialization
+    _initializeWithToday(now);
+    return CalendarState(focusedDay: now, selectedDay: now, isLoading: true);
+  }
+
+  /// Initialize calendar with today's data
+  Future<void> _initializeWithToday(DateTime today) async {
+    await _loadMonthPrayerStatus(today.year, today.month);
+    await _loadSelectedDayPrayers(today);
+  }
+
+  /// Load prayers for a selected day (internal helper)
+  Future<void> _loadSelectedDayPrayers(DateTime selectedDay) async {
+    try {
+      final dateStr = CalendarState._formatDate(selectedDay);
+      final prayers = await _databaseService.getPrayersByDate(dateStr);
+      state = state.copyWith(selectedDayPrayers: prayers, isLoading: false);
+    } catch (e) {
+      state = state.copyWith(error: e.toString(), isLoading: false);
+    }
   }
 
   /// Load prayer status for all days in a month
@@ -145,14 +163,7 @@ class CalendarNotifier extends Notifier<CalendarState> {
   /// Select a day
   Future<void> selectDay(DateTime selectedDay) async {
     state = state.copyWith(selectedDay: selectedDay, isLoading: true);
-
-    try {
-      final dateStr = CalendarState._formatDate(selectedDay);
-      final prayers = await _databaseService.getPrayersByDate(dateStr);
-      state = state.copyWith(selectedDayPrayers: prayers, isLoading: false);
-    } catch (e) {
-      state = state.copyWith(error: e.toString(), isLoading: false);
-    }
+    await _loadSelectedDayPrayers(selectedDay);
   }
 
   /// Refresh current month

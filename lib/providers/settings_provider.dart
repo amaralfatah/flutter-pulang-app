@@ -11,6 +11,7 @@ class SettingsState {
   final bool autoBackupEnabled;
   final String? lastBackupDate;
   final String? googleAccountEmail;
+  final String themeMode; // 'system', 'light', 'dark'
   final bool isLoading;
 
   const SettingsState({
@@ -20,6 +21,7 @@ class SettingsState {
     this.autoBackupEnabled = true,
     this.lastBackupDate,
     this.googleAccountEmail,
+    this.themeMode = 'system',
     this.isLoading = false,
   });
 
@@ -30,6 +32,7 @@ class SettingsState {
     bool? autoBackupEnabled,
     String? lastBackupDate,
     String? googleAccountEmail,
+    String? themeMode,
     bool? isLoading,
   }) {
     return SettingsState(
@@ -39,6 +42,7 @@ class SettingsState {
       autoBackupEnabled: autoBackupEnabled ?? this.autoBackupEnabled,
       lastBackupDate: lastBackupDate ?? this.lastBackupDate,
       googleAccountEmail: googleAccountEmail ?? this.googleAccountEmail,
+      themeMode: themeMode ?? this.themeMode,
       isLoading: isLoading ?? this.isLoading,
     );
   }
@@ -74,6 +78,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
     final lastBackupDate = await _preferencesService.getLastBackupDate();
     final googleAccountEmail = await _preferencesService
         .getGoogleAccountEmail();
+    final themeMode = await _preferencesService.getThemeMode();
 
     state = SettingsState(
       cityId: cityId,
@@ -82,6 +87,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
       autoBackupEnabled: autoBackupEnabled,
       lastBackupDate: lastBackupDate,
       googleAccountEmail: googleAccountEmail,
+      themeMode: themeMode,
       isLoading: false,
     );
   }
@@ -138,6 +144,12 @@ class SettingsNotifier extends Notifier<SettingsState> {
   Future<void> clearGoogleAccount() async {
     await _preferencesService.setGoogleAccountEmail(null);
     state = state.copyWith(googleAccountEmail: null);
+  }
+
+  /// Set theme mode ('system', 'light', 'dark')
+  Future<void> setThemeMode(String mode) async {
+    await _preferencesService.setThemeMode(mode);
+    state = state.copyWith(themeMode: mode);
   }
 
   /// Refresh settings

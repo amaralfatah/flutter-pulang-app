@@ -2,9 +2,6 @@ import 'dart:io';
 
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:intl/intl.dart';
-import 'package:timezone/data/latest_all.dart' as tz;
-import 'package:timezone/timezone.dart' as tz;
 
 import '../models/models.dart';
 
@@ -24,11 +21,6 @@ class NotificationService {
   /// Initialize notifications and alarm manager
   Future<void> init() async {
     if (_isInitialized) return;
-
-    // Initialize timezone database
-    tz.initializeTimeZones();
-    // Set local location to Jakarta (WIB) as default/base, but ideally should be dynamic
-    // For now we assume local device time is correct.
 
     // 1. Setup Android Alarm Manager
     await AndroidAlarmManager.initialize();

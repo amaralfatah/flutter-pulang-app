@@ -11,6 +11,7 @@ class PreferencesService {
   static const String _keyLastBackupDate = 'last_backup_date';
   static const String _keyAutoBackupEnabled = 'auto_backup_enabled';
   static const String _keyGoogleAccountEmail = 'google_account_email';
+  static const String _keyThemeMode = 'theme_mode';
 
   /// Initialize SharedPreferences
   Future<void> init() async {
@@ -110,6 +111,20 @@ class PreferencesService {
       return p.remove(_keyGoogleAccountEmail);
     }
     return p.setString(_keyGoogleAccountEmail, email);
+  }
+
+  // ============ THEME SETTINGS ============
+
+  /// Get saved theme mode ('system', 'light', 'dark')
+  Future<String> getThemeMode() async {
+    final p = await prefs;
+    return p.getString(_keyThemeMode) ?? 'system';
+  }
+
+  /// Set theme mode
+  Future<bool> setThemeMode(String mode) async {
+    final p = await prefs;
+    return p.setString(_keyThemeMode, mode);
   }
 
   // ============ UTILITY METHODS ============

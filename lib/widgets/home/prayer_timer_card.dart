@@ -1,9 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../app/theme/app_colors.dart';
-import '../../app/theme/app_shadows.dart';
-import '../../app/theme/app_theme.dart';
 import '../../providers/providers.dart';
 import '../patterns/pattern_painters.dart';
 
@@ -15,18 +12,18 @@ class PrayerTimerCard extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final prayerTimesState = ref.watch(prayerTimesProvider);
+    final colorScheme = Theme.of(context).colorScheme;
 
-    return Container(
+    return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-        color: AppColors.primary,
-        boxShadow: [AppShadows.light],
-      ),
+      color: colorScheme.primary,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+        borderRadius: BorderRadius.circular(12),
         child: CustomPaint(
-          painter: IslamicPatternPainter(color: Colors.white, opacity: 0.1),
+          painter: IslamicPatternPainter(
+            color: colorScheme.onPrimary,
+            opacity: 0.1,
+          ),
           child: Padding(
             padding: const EdgeInsets.all(24),
             child: _buildContent(context, prayerTimesState),
@@ -37,11 +34,14 @@ class PrayerTimerCard extends ConsumerWidget {
   }
 
   Widget _buildContent(BuildContext context, PrayerTimesState state) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final onPrimary = colorScheme.onPrimary;
+
     if (state.isLoading) {
-      return const SizedBox(
+      return SizedBox(
         height: 140,
         child: Center(
-          child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3),
+          child: CircularProgressIndicator(color: onPrimary, strokeWidth: 3),
         ),
       );
     }
@@ -55,17 +55,15 @@ class PrayerTimerCard extends ConsumerWidget {
             children: [
               Icon(
                 Icons.cloud_off_rounded,
-                color: Colors.white.withOpacity(0.7),
+                color: onPrimary.withValues(alpha: 0.7),
                 size: 36,
               ),
               const SizedBox(height: 12),
               Text(
                 'Gagal memuat jadwal',
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.9),
-                  fontSize: 15,
-                  fontWeight: FontWeight.w500,
-                ),
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyLarge?.copyWith(color: onPrimary),
               ),
             ],
           ),
@@ -82,16 +80,14 @@ class PrayerTimerCard extends ConsumerWidget {
           children: [
             Icon(
               Icons.access_time_rounded,
-              color: Colors.white.withOpacity(0.8),
+              color: onPrimary.withValues(alpha: 0.8),
               size: 16,
             ),
             const SizedBox(width: 6),
             Text(
               'Solat Berikutnya',
-              style: TextStyle(
-                color: Colors.white.withOpacity(0.85),
-                fontSize: 13,
-                fontWeight: FontWeight.w500,
+              style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: onPrimary.withValues(alpha: 0.85),
                 letterSpacing: 0.3,
               ),
             ),
@@ -103,12 +99,9 @@ class PrayerTimerCard extends ConsumerWidget {
         // Prayer Name - Hero text
         Text(
           state.nextPrayerName ?? '-',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 38,
+          style: Theme.of(context).textTheme.displaySmall?.copyWith(
+            color: onPrimary,
             fontWeight: FontWeight.bold,
-            letterSpacing: 0.5,
-            height: 1.1,
           ),
         ),
 
@@ -117,12 +110,9 @@ class PrayerTimerCard extends ConsumerWidget {
         // Prayer Time
         Text(
           state.nextPrayerTime ?? '--:--',
-          style: TextStyle(
-            color: Colors.white.withOpacity(0.95),
-            fontSize: 20,
-            fontWeight: FontWeight.w500,
-            letterSpacing: 1,
-          ),
+          style: Theme.of(
+            context,
+          ).textTheme.titleLarge?.copyWith(color: onPrimary, letterSpacing: 1),
         ),
 
         const SizedBox(height: 20),
@@ -131,24 +121,19 @@ class PrayerTimerCard extends ConsumerWidget {
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.15),
+            color: onPrimary.withValues(alpha: 0.15),
             borderRadius: BorderRadius.circular(20),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
-                Icons.timer_outlined,
-                color: Colors.white.withOpacity(0.9),
-                size: 16,
-              ),
+              Icon(Icons.timer_outlined, color: onPrimary, size: 16),
               const SizedBox(width: 6),
               Text(
                 _getCountdownText(state.remainingTime),
-                style: const TextStyle(
-                  color: Colors.white,
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: onPrimary,
                   fontWeight: FontWeight.w600,
-                  fontSize: 13,
                 ),
               ),
             ],

@@ -1,13 +1,15 @@
 import 'package:flutter/material.dart';
 
-import '../../app/theme/app_colors.dart';
-import '../../app/theme/app_theme.dart';
+import '../../app/extensions/color_scheme_extensions.dart';
+
+/// Type of check-in option for M3 color mapping
+enum CheckInType { onTime, late, missed }
 
 /// Shared check-in option widget for bottom sheets
 /// Used in HomeScreen and CalendarScreen for prayer check-in
 class CheckInOption extends StatelessWidget {
   final IconData icon;
-  final Color color;
+  final CheckInType type;
   final String title;
   final String subtitle;
   final VoidCallback onTap;
@@ -16,7 +18,7 @@ class CheckInOption extends StatelessWidget {
   const CheckInOption({
     super.key,
     required this.icon,
-    required this.color,
+    required this.type,
     required this.title,
     required this.subtitle,
     required this.onTap,
@@ -25,23 +27,41 @@ class CheckInOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: color.withOpacity(isSelected ? 0.15 : 0.08),
-      borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+    final colorScheme = Theme.of(context).colorScheme;
+
+    // Map type to M3 container colors using semantic extensions
+    final (Color containerColor, Color contentColor) = switch (type) {
+      CheckInType.onTime => (
+        colorScheme.statusOnTimeContainer,
+        colorScheme.onStatusOnTimeContainer,
+      ),
+      CheckInType.late => (
+        colorScheme.statusLateContainer,
+        colorScheme.onStatusLateContainer,
+      ),
+      CheckInType.missed => (
+        colorScheme.statusMissedContainer,
+        colorScheme.onStatusMissedContainer,
+      ),
+    };
+
+    return Card(
+      // elevation: isSelected ? 0 : 1,
+      color: containerColor,
+      shape: isSelected
+          ? RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: contentColor, width: 2),
+            )
+          : null,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-        child: Container(
-          decoration: isSelected
-              ? BoxDecoration(
-                  borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-                  border: Border.all(color: color, width: 2),
-                )
-              : null,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              Icon(icon, color: color, size: 32),
+              Icon(icon, color: contentColor, size: 32),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
@@ -49,28 +69,26 @@ class CheckInOption extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: TextStyle(
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
-                        color: color,
-                        fontSize: 16,
+                        color: contentColor,
                       ),
                     ),
                     Text(
                       subtitle,
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 13,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],
                 ),
               ),
               if (isSelected)
-                Icon(Icons.check_circle_rounded, color: color, size: 24)
+                Icon(Icons.check_circle_rounded, color: contentColor, size: 24)
               else
                 Icon(
                   Icons.arrow_forward_ios_rounded,
-                  color: color.withOpacity(0.5),
+                  color: contentColor,
                   size: 16,
                 ),
             ],

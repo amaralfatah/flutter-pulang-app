@@ -3,8 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/router.dart';
-import '../../app/theme/app_colors.dart';
-import '../../app/theme/app_theme.dart';
+
 import '../../providers/providers.dart';
 import '../../services/services.dart';
 
@@ -26,6 +25,8 @@ class SettingsScreen extends ConsumerWidget {
           const SizedBox(height: 8),
           _buildNotificationSection(context, ref, settings, notifier),
           const SizedBox(height: 8),
+          _buildAppearanceSection(context, ref, settings, notifier),
+          const SizedBox(height: 8),
           _buildBackupSection(context, ref, settings, notifier),
           const SizedBox(height: 8),
           _buildAboutSection(context, ref, settings),
@@ -40,7 +41,7 @@ class SettingsScreen extends ConsumerWidget {
       child: Text(
         title,
         style: Theme.of(context).textTheme.titleMedium?.copyWith(
-          color: AppColors.secondary,
+          color: Theme.of(context).colorScheme.primary,
           fontWeight: FontWeight.bold,
         ),
       ),
@@ -60,25 +61,27 @@ class SettingsScreen extends ConsumerWidget {
           leading: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
+              color: Theme.of(context).colorScheme.primaryContainer,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.location_on_outlined,
-              color: AppColors.primary,
+              color: Theme.of(context).colorScheme.primary,
             ),
           ),
           title: Text(
             settings.cityName ?? 'Belum pilih kota',
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
-          subtitle: const Text(
+          subtitle: Text(
             'Digunakan untuk jadwal solat',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
-          trailing: const Icon(
+          trailing: Icon(
             Icons.chevron_right_rounded,
-            color: AppColors.textSecondary,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
           onTap: () => _showCitySearchDialog(context, ref),
         ),
@@ -100,21 +103,24 @@ class SettingsScreen extends ConsumerWidget {
           secondary: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
+              color: Theme.of(context).colorScheme.primaryContainer,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.notifications_active_outlined,
-              color: AppColors.primary,
+              color: Theme.of(context).colorScheme.primary,
             ),
           ),
           title: const Text(
             'Aktifkan Notifikasi',
             style: TextStyle(fontWeight: FontWeight.w600),
           ),
-          subtitle: const Text(
+          subtitle: Text(
             'Notifikasi saat masuk waktu solat',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 13,
+            ),
           ),
           value: settings.notificationEnabled,
           onChanged: (value) => notifier.setNotificationEnabled(value),
@@ -123,21 +129,24 @@ class SettingsScreen extends ConsumerWidget {
           leading: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppColors.accent.withOpacity(0.1),
+              color: Theme.of(context).colorScheme.tertiaryContainer,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.notification_important_outlined,
-              color: AppColors.accent,
+              color: Theme.of(context).colorScheme.tertiary,
             ),
           ),
           title: const Text(
             'Test Notifikasi',
             style: TextStyle(fontWeight: FontWeight.w600),
           ),
-          subtitle: const Text(
+          subtitle: Text(
             'Kirim notifikasi sekarang (Debug)',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 13,
+            ),
           ),
           onTap: () async {
             await ref.read(notificationServiceProvider).requestPermissions();
@@ -151,15 +160,189 @@ class SettingsScreen extends ConsumerWidget {
 
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Notifikasi dikirim (Tunggu beberapa detik)'),
-                  backgroundColor: AppColors.secondary,
+                SnackBar(
+                  content: const Text(
+                    'Notifikasi dikirim (Tunggu beberapa detik)',
+                  ),
+                  backgroundColor: Theme.of(context).colorScheme.secondary,
                 ),
               );
             }
           },
         ),
       ],
+    );
+  }
+
+  Widget _buildAppearanceSection(
+    BuildContext context,
+    WidgetRef ref,
+    SettingsState settings,
+    SettingsNotifier notifier,
+  ) {
+    String getThemeModeLabel(String mode) {
+      switch (mode) {
+        case 'light':
+          return 'Mode Terang';
+        case 'dark':
+          return 'Mode Gelap';
+        default:
+          return 'Ikuti Sistem';
+      }
+    }
+
+    IconData getThemeModeIcon(String mode) {
+      switch (mode) {
+        case 'light':
+          return Icons.light_mode_outlined;
+        case 'dark':
+          return Icons.dark_mode_outlined;
+        default:
+          return Icons.brightness_auto_outlined;
+      }
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildSectionHeader(context, 'Tampilan'),
+        ListTile(
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.primaryContainer,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              getThemeModeIcon(settings.themeMode),
+              color: Theme.of(context).colorScheme.primary,
+            ),
+          ),
+          title: const Text(
+            'Mode Tampilan',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          subtitle: Text(
+            getThemeModeLabel(settings.themeMode),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 13,
+            ),
+          ),
+          trailing: Icon(
+            Icons.chevron_right_rounded,
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
+          ),
+          onTap: () => _showThemeModeDialog(context, settings, notifier),
+        ),
+      ],
+    );
+  }
+
+  void _showThemeModeDialog(
+    BuildContext context,
+    SettingsState settings,
+    SettingsNotifier notifier,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(
+          'Pilih Mode Tampilan',
+          style: TextStyle(
+            color: Theme.of(context).colorScheme.primary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildThemeOption(
+              context: context,
+              icon: Icons.brightness_auto_outlined,
+              title: 'Ikuti Sistem',
+              subtitle: 'Otomatis sesuai pengaturan perangkat',
+              value: 'system',
+              currentValue: settings.themeMode,
+              onTap: () {
+                notifier.setThemeMode('system');
+                Navigator.pop(context);
+              },
+            ),
+            _buildThemeOption(
+              context: context,
+              icon: Icons.light_mode_outlined,
+              title: 'Mode Terang',
+              subtitle: 'Tampilan cerah untuk siang hari',
+              value: 'light',
+              currentValue: settings.themeMode,
+              onTap: () {
+                notifier.setThemeMode('light');
+                Navigator.pop(context);
+              },
+            ),
+            _buildThemeOption(
+              context: context,
+              icon: Icons.dark_mode_outlined,
+              title: 'Mode Gelap',
+              subtitle: 'Tampilan gelap untuk malam hari',
+              value: 'dark',
+              currentValue: settings.themeMode,
+              onTap: () {
+                notifier.setThemeMode('dark');
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildThemeOption({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required String value,
+    required String currentValue,
+    required VoidCallback onTap,
+  }) {
+    final isSelected = value == currentValue;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? colorScheme.primaryContainer
+              : colorScheme.surfaceContainerHighest,
+          shape: BoxShape.circle,
+        ),
+        child: Icon(
+          icon,
+          color: isSelected
+              ? colorScheme.primary
+              : colorScheme.onSurfaceVariant,
+        ),
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+          color: isSelected ? colorScheme.primary : colorScheme.onSurface,
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 12),
+      ),
+      trailing: isSelected
+          ? Icon(Icons.check_circle, color: colorScheme.primary)
+          : null,
+      onTap: onTap,
     );
   }
 
@@ -179,25 +362,34 @@ class SettingsScreen extends ConsumerWidget {
           leading: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
+              color: Theme.of(context).colorScheme.primaryContainer,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.account_circle_outlined,
-              color: AppColors.primary,
+              color: Theme.of(context).colorScheme.primary,
             ),
           ),
           title: Text(
             settings.googleAccountEmail ?? 'Belum Login Google',
             style: const TextStyle(fontWeight: FontWeight.w600),
           ),
-          subtitle: const Text(
+          subtitle: Text(
             'Untuk backup ke Google Drive',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 13,
+            ),
           ),
           trailing: settings.googleAccountEmail == null
-              ? const Icon(Icons.login_rounded, color: AppColors.primary)
-              : const Icon(Icons.logout_rounded, color: AppColors.error),
+              ? Icon(
+                  Icons.login_rounded,
+                  color: Theme.of(context).colorScheme.primary,
+                )
+              : Icon(
+                  Icons.logout_rounded,
+                  color: Theme.of(context).colorScheme.error,
+                ),
           onTap: () async {
             if (settings.googleAccountEmail == null) {
               await backupService.signIn();
@@ -213,21 +405,24 @@ class SettingsScreen extends ConsumerWidget {
             secondary: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
+                color: Theme.of(context).colorScheme.primaryContainer,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.backup_outlined,
-                color: AppColors.primary,
+                color: Theme.of(context).colorScheme.primary,
               ),
             ),
             title: const Text(
               'Auto Backup',
               style: TextStyle(fontWeight: FontWeight.w600),
             ),
-            subtitle: const Text(
+            subtitle: Text(
               'Backup otomatis ke Google Drive',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 13,
+              ),
             ),
             value: settings.autoBackupEnabled,
             onChanged: (value) => notifier.setAutoBackupEnabled(value),
@@ -236,12 +431,12 @@ class SettingsScreen extends ConsumerWidget {
             leading: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
+                color: Theme.of(context).colorScheme.primaryContainer,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.cloud_upload_outlined,
-                color: AppColors.primary,
+                color: Theme.of(context).colorScheme.primary,
               ),
             ),
             title: const Text(
@@ -252,8 +447,8 @@ class SettingsScreen extends ConsumerWidget {
               settings.lastBackupDate != null
                   ? 'Terakhir: ${settings.lastBackupDate}'
                   : 'Belum pernah backup',
-              style: const TextStyle(
-                color: AppColors.textSecondary,
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 fontSize: 13,
               ),
             ),
@@ -263,21 +458,24 @@ class SettingsScreen extends ConsumerWidget {
             leading: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: AppColors.accent.withOpacity(0.1),
+                color: Theme.of(context).colorScheme.tertiaryContainer,
                 shape: BoxShape.circle,
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.cloud_download_outlined,
-                color: AppColors.accent,
+                color: Theme.of(context).colorScheme.tertiary,
               ),
             ),
             title: const Text(
               'Restore Data',
               style: TextStyle(fontWeight: FontWeight.w600),
             ),
-            subtitle: const Text(
+            subtitle: Text(
               'Kembalikan data dari Google Drive',
-              style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontSize: 13,
+              ),
             ),
             onTap: () => _showRestoreDialog(context, ref),
           ),
@@ -291,9 +489,9 @@ class SettingsScreen extends ConsumerWidget {
     final notifier = ref.read(settingsProvider.notifier);
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Sedang melakukan backup...'),
-        backgroundColor: AppColors.secondary,
+      SnackBar(
+        content: const Text('Sedang melakukan backup...'),
+        backgroundColor: Theme.of(context).colorScheme.secondary,
       ),
     );
 
@@ -304,9 +502,11 @@ class SettingsScreen extends ConsumerWidget {
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Backup berhasil!'),
-            backgroundColor: AppColors.success,
+          SnackBar(
+            content: const Text('Backup berhasil!'),
+            backgroundColor: Theme.of(
+              context,
+            ).colorScheme.primary, // success -> primary
           ),
         );
       }
@@ -315,7 +515,7 @@ class SettingsScreen extends ConsumerWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Gagal backup: $e'),
-            backgroundColor: AppColors.error,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }
@@ -336,8 +536,10 @@ class SettingsScreen extends ConsumerWidget {
       context: context,
       barrierDismissible: false,
       useRootNavigator: true,
-      builder: (ctx) => const Center(
-        child: CircularProgressIndicator(color: AppColors.primary),
+      builder: (ctx) => Center(
+        child: CircularProgressIndicator(
+          color: Theme.of(context).colorScheme.primary,
+        ),
       ),
     );
 
@@ -357,21 +559,23 @@ class SettingsScreen extends ConsumerWidget {
         useRootNavigator: true,
         builder: (dialogContext) => AlertDialog(
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+            borderRadius: BorderRadius.circular(20.0),
           ),
-          title: const Text(
+          title: Text(
             'Pilih File Backup',
             style: TextStyle(
-              color: AppColors.secondary,
+              color: Theme.of(context).colorScheme.secondary,
               fontWeight: FontWeight.bold,
             ),
           ),
           content: SizedBox(
             width: double.maxFinite,
             child: backups.isEmpty
-                ? const Text(
+                ? Text(
                     'Tidak ada file backup ditemukan.',
-                    style: TextStyle(color: AppColors.textSecondary),
+                    style: TextStyle(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
                   )
                 : ListView.builder(
                     shrinkWrap: true,
@@ -388,8 +592,10 @@ class SettingsScreen extends ConsumerWidget {
                         ),
                         subtitle: Text(
                           file.name ?? 'No Name',
-                          style: const TextStyle(
-                            color: AppColors.textSecondary,
+                          style: TextStyle(
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurfaceVariant,
                             fontSize: 13,
                           ),
                         ),
@@ -415,9 +621,11 @@ class SettingsScreen extends ConsumerWidget {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
-              child: const Text(
+              child: Text(
                 'Batal',
-                style: TextStyle(color: AppColors.textSecondary),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               ),
             ),
           ],
@@ -432,7 +640,7 @@ class SettingsScreen extends ConsumerWidget {
       scaffoldMessenger.showSnackBar(
         SnackBar(
           content: Text('Gagal mengambil list backup: $e'),
-          backgroundColor: AppColors.error,
+          backgroundColor: Theme.of(context).colorScheme.error,
         ),
       );
     }
@@ -451,38 +659,46 @@ class SettingsScreen extends ConsumerWidget {
       useRootNavigator: true,
       builder: (dialogContext) => AlertDialog(
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+          borderRadius: BorderRadius.circular(20.0),
         ),
-        title: const Text(
+        title: Text(
           'Restore Data?',
           style: TextStyle(
-            color: AppColors.secondary,
+            color: Theme.of(context).colorScheme.secondary,
             fontWeight: FontWeight.bold,
           ),
         ),
-        content: const Text(
+        content: Text(
           'PERINGATAN: Tindakan ini akan MENIMPA data yang ada sekarang dengan data dari backup. Lanjutkan?',
-          style: TextStyle(color: AppColors.textPrimary),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
-            child: const Text(
+            child: Text(
               'Batal',
-              style: TextStyle(color: AppColors.textSecondary),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
           TextButton(
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
             onPressed: () async {
               Navigator.of(context, rootNavigator: true).pop();
 
               scaffoldMessenger.showSnackBar(
-                const SnackBar(
-                  content: Text('Sedang me-restore data...'),
-                  backgroundColor: AppColors.secondary,
+                SnackBar(
+                  content: const Text('Sedang me-restore data...'),
+                  backgroundColor: Theme.of(context).colorScheme.secondary,
                 ),
               );
+
+              // Capture colors before async operations
+              final primaryColor = Theme.of(context).colorScheme.primary;
+              final errorColor = Theme.of(context).colorScheme.error;
 
               try {
                 await backupService.restore(fileId);
@@ -492,9 +708,9 @@ class SettingsScreen extends ConsumerWidget {
                 ref.invalidate(prayerTimesProvider);
 
                 scaffoldMessenger.showSnackBar(
-                  const SnackBar(
-                    content: Text('Data berhasil di-restore!'),
-                    backgroundColor: AppColors.success,
+                  SnackBar(
+                    content: const Text('Data berhasil di-restore!'),
+                    backgroundColor: primaryColor,
                   ),
                 );
 
@@ -504,7 +720,7 @@ class SettingsScreen extends ConsumerWidget {
                 scaffoldMessenger.showSnackBar(
                   SnackBar(
                     content: Text('Gagal restore: $e'),
-                    backgroundColor: AppColors.error,
+                    backgroundColor: errorColor,
                   ),
                 );
               }
@@ -529,45 +745,50 @@ class SettingsScreen extends ConsumerWidget {
           leading: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppColors.textSecondary.withOpacity(0.1),
+              color: Theme.of(context).colorScheme.surfaceContainerHighest,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.info_outline_rounded,
-              color: AppColors.textSecondary,
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           title: const Text(
             'Versi Aplikasi',
             style: TextStyle(fontWeight: FontWeight.w600),
           ),
-          subtitle: const Text(
+          subtitle: Text(
             '1.0.0 (Beta)',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
           ),
         ),
         ListTile(
           leading: Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: AppColors.error.withOpacity(0.1),
+              color: Theme.of(context).colorScheme.errorContainer,
               shape: BoxShape.circle,
             ),
-            child: const Icon(
+            child: Icon(
               Icons.delete_forever_outlined,
-              color: AppColors.error,
+              color: Theme.of(context).colorScheme.error,
             ),
           ),
-          title: const Text(
+          title: Text(
             'Reset Data',
             style: TextStyle(
               fontWeight: FontWeight.w600,
-              color: AppColors.error,
+              color: Theme.of(context).colorScheme.error,
             ),
           ),
-          subtitle: const Text(
+          subtitle: Text(
             'Hapus semua data dan kembali ke awal',
-            style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 13,
+            ),
           ),
           onTap: () => _showResetConfirmDialog(context, ref),
         ),
@@ -585,29 +806,33 @@ class SettingsScreen extends ConsumerWidget {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+          borderRadius: BorderRadius.circular(20.0),
         ),
-        title: const Text(
+        title: Text(
           'Reset Data?',
           style: TextStyle(
-            color: AppColors.secondary,
+            color: Theme.of(context).colorScheme.secondary,
             fontWeight: FontWeight.bold,
           ),
         ),
-        content: const Text(
+        content: Text(
           'Apakah Anda yakin ingin menghapus SEMUA data solat dan setting? Tindakan ini tidak bisa dibatalkan.',
-          style: TextStyle(color: AppColors.textPrimary),
+          style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text(
+            child: Text(
               'Batal',
-              style: TextStyle(color: AppColors.textSecondary),
+              style: TextStyle(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
             ),
           ),
           TextButton(
-            style: TextButton.styleFrom(foregroundColor: AppColors.error),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+            ),
             onPressed: () async {
               Navigator.pop(context);
               await _resetData(context, ref);
@@ -622,9 +847,9 @@ class SettingsScreen extends ConsumerWidget {
   Future<void> _resetData(BuildContext context, WidgetRef ref) async {
     if (!context.mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Mereset data...'),
-        backgroundColor: AppColors.secondary,
+      SnackBar(
+        content: const Text('Mereset data...'),
+        backgroundColor: Theme.of(context).colorScheme.secondary,
       ),
     );
 
@@ -641,9 +866,11 @@ class SettingsScreen extends ConsumerWidget {
 
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Data berhasil direset'),
-            backgroundColor: AppColors.success,
+          SnackBar(
+            content: const Text('Data berhasil direset'),
+            backgroundColor: Theme.of(
+              context,
+            ).colorScheme.primary, // success -> primary
           ),
         );
         context.go(AppRoutes.home);
@@ -653,7 +880,7 @@ class SettingsScreen extends ConsumerWidget {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Gagal reset data: $e'),
-            backgroundColor: AppColors.error,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }
@@ -704,9 +931,7 @@ class _CitySearchDialogState extends ConsumerState<_CitySearchDialog> {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-      ),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20.0)),
       child: Container(
         padding: const EdgeInsets.all(20),
         constraints: const BoxConstraints(maxHeight: 500),
@@ -716,7 +941,7 @@ class _CitySearchDialogState extends ConsumerState<_CitySearchDialog> {
             Text(
               'Cari Kota',
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                color: AppColors.secondary,
+                color: Theme.of(context).colorScheme.secondary,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -725,31 +950,33 @@ class _CitySearchDialogState extends ConsumerState<_CitySearchDialog> {
               controller: _searchController,
               decoration: InputDecoration(
                 hintText: 'Masukkan nama kota (min. 3 huruf)',
-                hintStyle: const TextStyle(
-                  color: AppColors.textSecondary,
+                hintStyle: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                   fontSize: 14,
                 ),
                 filled: true,
-                fillColor: AppColors.background,
+                fillColor: Theme.of(context).colorScheme.surface,
                 border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppTheme.cardRadius),
+                  borderRadius: BorderRadius.circular(20.0),
                   borderSide: BorderSide.none,
                 ),
                 enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-                  borderSide: const BorderSide(color: AppColors.divider),
+                  borderRadius: BorderRadius.circular(20.0),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).colorScheme.outlineVariant,
+                  ),
                 ),
                 focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppTheme.cardRadius),
-                  borderSide: const BorderSide(
-                    color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(20.0),
+                  borderSide: BorderSide(
+                    color: Theme.of(context).colorScheme.primary,
                     width: 1.5,
                   ),
                 ),
                 suffixIcon: IconButton(
-                  icon: const Icon(
+                  icon: Icon(
                     Icons.search_rounded,
-                    color: AppColors.primary,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
                   onPressed: () => _searchCities(_searchController.text),
                 ),
@@ -759,13 +986,20 @@ class _CitySearchDialogState extends ConsumerState<_CitySearchDialog> {
             ),
             const SizedBox(height: 16),
             if (_isLoading)
-              const CircularProgressIndicator(color: AppColors.primary)
+              CircularProgressIndicator(
+                color: Theme.of(context).colorScheme.primary,
+              )
             else if (_error != null)
-              Text(_error!, style: const TextStyle(color: AppColors.error))
+              Text(
+                _error!,
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              )
             else if (_cities.isEmpty && _searchController.text.isNotEmpty)
-              const Text(
+              Text(
                 'Kota tidak ditemukan',
-                style: TextStyle(color: AppColors.textSecondary),
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
               )
             else
               Expanded(
@@ -791,7 +1025,9 @@ class _CitySearchDialogState extends ConsumerState<_CitySearchDialog> {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text('Kota diubah ke ${city.name}'),
-                              backgroundColor: AppColors.success,
+                              backgroundColor: Theme.of(
+                                context,
+                              ).colorScheme.primary, // success -> primary
                             ),
                           );
                         }

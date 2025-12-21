@@ -13,14 +13,29 @@ class PulangApp extends ConsumerWidget {
     // Initialize date change service to monitor for day changes
     ref.watch(dateChangeServiceProvider);
 
+    // Watch theme mode from settings
+    final settings = ref.watch(settingsProvider);
+    final themeMode = _getThemeMode(settings.themeMode);
+
     return MaterialApp.router(
       title: 'Pulang - Presensi Solat',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
-      themeMode:
-          ThemeMode.light, // Force light theme for consistent Islamic aesthetic
+      themeMode: themeMode,
       routerConfig: router,
     );
+  }
+
+  /// Convert string to ThemeMode enum
+  ThemeMode _getThemeMode(String mode) {
+    switch (mode) {
+      case 'light':
+        return ThemeMode.light;
+      case 'dark':
+        return ThemeMode.dark;
+      default:
+        return ThemeMode.system;
+    }
   }
 }

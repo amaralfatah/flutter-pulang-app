@@ -37,12 +37,16 @@ class HistoryEntry {
   final int completedCount;
   final int totalCount;
   final List<String> completedPrayers;
+  final List<String> onTimePrayers;
+  final List<String> latePrayers;
 
   HistoryEntry({
     required this.date,
     required this.completedCount,
     this.totalCount = 5,
     this.completedPrayers = const [],
+    this.onTimePrayers = const [],
+    this.latePrayers = const [],
   });
 }
 
@@ -66,11 +70,20 @@ class HistoryNotifier extends Notifier<HistoryState> {
       );
       final entries = data.map((e) {
         final completedStr = e['completed_prayers'] as String?;
-        final completedList = completedStr?.split(',') ?? [];
+        final completedList =
+            completedStr?.split(',').where((s) => s.isNotEmpty).toList() ?? [];
+        final onTimeStr = e['on_time_prayers'] as String?;
+        final onTimeList =
+            onTimeStr?.split(',').where((s) => s.isNotEmpty).toList() ?? [];
+        final lateStr = e['late_prayers'] as String?;
+        final lateList =
+            lateStr?.split(',').where((s) => s.isNotEmpty).toList() ?? [];
         return HistoryEntry(
           date: e['date'] as String,
           completedCount: e['completed_count'] as int,
           completedPrayers: completedList,
+          onTimePrayers: onTimeList,
+          latePrayers: lateList,
         );
       }).toList();
 
@@ -97,11 +110,20 @@ class HistoryNotifier extends Notifier<HistoryState> {
 
       final newEntries = data.map((e) {
         final completedStr = e['completed_prayers'] as String?;
-        final completedList = completedStr?.split(',') ?? [];
+        final completedList =
+            completedStr?.split(',').where((s) => s.isNotEmpty).toList() ?? [];
+        final onTimeStr = e['on_time_prayers'] as String?;
+        final onTimeList =
+            onTimeStr?.split(',').where((s) => s.isNotEmpty).toList() ?? [];
+        final lateStr = e['late_prayers'] as String?;
+        final lateList =
+            lateStr?.split(',').where((s) => s.isNotEmpty).toList() ?? [];
         return HistoryEntry(
           date: e['date'] as String,
           completedCount: e['completed_count'] as int,
           completedPrayers: completedList,
+          onTimePrayers: onTimeList,
+          latePrayers: lateList,
         );
       }).toList();
 

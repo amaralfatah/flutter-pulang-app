@@ -204,11 +204,6 @@ class BackupService {
     // Retrieve the authorization tokens from the current user using AuthorizationClient
     final authClient = _currentUser!.authorizationClient;
 
-    // DEBUG LOGGING
-    print('DEBUG: Requesting headers for scopes: $_driveScopes');
-    print('DEBUG: Current User ID: ${_currentUser!.id}');
-    print('DEBUG: Current User Email: ${_currentUser!.email}');
-
     // Try to get headers, prompting if necessary (IMPORTANT for new users)
     // We explicitly set promptIfNecessary: true to handle cases where
     // scopeHint in authenticate() wasn't enough.
@@ -219,23 +214,19 @@ class BackupService {
 
     // If still null, try one last force authorization
     if (headers == null) {
-      print('DEBUG: Headers null, attempting explicit authorizeScopes...');
       try {
         await authClient.authorizeScopes(_driveScopes);
         headers = await authClient.authorizationHeaders(_driveScopes);
-      } catch (e) {
-        print('DEBUG: Explicit authorization failed: $e');
+      } catch (_) {
+        // Silently fail - the null check below will handle the error
       }
     }
 
     if (headers == null) {
-      print('DEBUG: Authorization headers returned NULL.');
       // This often happens if the SHA-1 is missing in Console or scopes were rejected.
       throw Exception(
         'Failed to get authorization headers. Check SHA-1/Scopes.',
       );
-    } else {
-      print('DEBUG: Headers obtained successfully: ${headers.keys}');
     }
 
     return AuthClient(headers);

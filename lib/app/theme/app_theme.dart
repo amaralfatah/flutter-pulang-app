@@ -2,181 +2,70 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'app_colors.dart';
 
-/// App theme configuration following Islamic Modern Minimalist design
+/// App theme configuration following strict Material Design 3 guidelines
 class AppTheme {
   AppTheme._();
 
-  /// Standard border radius for cards (20px - very rounded)
-  static const double cardRadius = 20.0;
-
-  /// Border radius for buttons (30px - pill shape)
-  static const double buttonRadius = 30.0;
-
-  /// Border radius for bottom sheets (32px top)
-  static const double bottomSheetRadius = 32.0;
+  // Amber/Yellow colors for warning/late status
+  static const Color _warningColor = Color(0xFFF59E0B); // Amber 500
+  static const Color _warningContainerLight = Color(0xFFFEF3C7); // Amber 100
+  static const Color _onWarningContainerLight = Color(0xFF92400E); // Amber 800
+  static const Color _warningContainerDark = Color(0xFF78350F); // Amber 900
+  static const Color _onWarningContainerDark = Color(0xFFFDE68A); // Amber 200
 
   /// Light theme
-  static ThemeData get light => ThemeData(
-    useMaterial3: true,
-    brightness: Brightness.light,
+  static ThemeData get light {
+    final baseScheme = ColorScheme.fromSeed(
+      seedColor: AppColors.seedColor,
+      brightness: Brightness.light,
+    );
 
-    // Color Scheme
-    colorScheme: const ColorScheme.light(
-      primary: AppColors.primary,
-      secondary: AppColors.secondary,
-      tertiary: AppColors.accent,
-      surface: AppColors.surface,
-      error: AppColors.error,
-      onPrimary: Colors.white,
-      onSecondary: Colors.white,
-      onSurface: AppColors.textPrimary,
-      onError: Colors.white,
-    ),
+    // Override tertiary with amber for warning/late status
+    final colorScheme = baseScheme.copyWith(
+      tertiary: _warningColor,
+      tertiaryContainer: _warningContainerLight,
+      onTertiary: Colors.white,
+      onTertiaryContainer: _onWarningContainerLight,
+    );
 
-    // Scaffold
-    scaffoldBackgroundColor: AppColors.background,
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: colorScheme,
 
-    // Typography
-    textTheme: GoogleFonts.plusJakartaSansTextTheme().copyWith(
-      headlineLarge: GoogleFonts.plusJakartaSans(
-        fontWeight: FontWeight.bold,
-        color: AppColors.secondary,
+      // Typography - Using GoogleFonts but deferring to M3 hierarchy
+      textTheme: GoogleFonts.interTextTheme(
+        ThemeData(brightness: Brightness.light).textTheme,
       ),
-      headlineMedium: GoogleFonts.plusJakartaSans(
-        fontWeight: FontWeight.bold,
-        color: AppColors.secondary,
-      ),
-      titleLarge: GoogleFonts.plusJakartaSans(
-        fontWeight: FontWeight.bold,
-        color: AppColors.secondary,
-      ),
-      titleMedium: GoogleFonts.plusJakartaSans(
-        fontWeight: FontWeight.w600,
-        color: AppColors.textPrimary,
-      ),
-      bodyLarge: GoogleFonts.plusJakartaSans(color: AppColors.textPrimary),
-      bodyMedium: GoogleFonts.plusJakartaSans(color: AppColors.textPrimary),
-      bodySmall: GoogleFonts.plusJakartaSans(color: AppColors.textSecondary),
-      labelLarge: GoogleFonts.plusJakartaSans(
-        fontWeight: FontWeight.w600,
-        color: AppColors.textPrimary,
-      ),
-    ),
 
-    // AppBar
-    appBarTheme: AppBarTheme(
-      centerTitle: true,
-      elevation: 0,
-      backgroundColor: AppColors.background,
-      foregroundColor: AppColors.secondary,
-      titleTextStyle: GoogleFonts.plusJakartaSans(
-        fontSize: 20,
-        fontWeight: FontWeight.bold,
-        color: AppColors.secondary,
+      // App Bar - Centered title for modern app style
+      appBarTheme: const AppBarTheme(centerTitle: true),
+    );
+  }
+
+  /// Dark theme
+  static ThemeData get dark {
+    final baseScheme = ColorScheme.fromSeed(
+      seedColor: AppColors.seedColor,
+      brightness: Brightness.dark,
+    );
+
+    // Override tertiary with amber for warning/late status
+    final colorScheme = baseScheme.copyWith(
+      tertiary: _warningColor,
+      tertiaryContainer: _warningContainerDark,
+      onTertiary: Colors.black,
+      onTertiaryContainer: _onWarningContainerDark,
+    );
+
+    return ThemeData(
+      useMaterial3: true,
+      colorScheme: colorScheme,
+
+      textTheme: GoogleFonts.interTextTheme(
+        ThemeData(brightness: Brightness.dark).textTheme,
       ),
-    ),
 
-    // Card
-    cardTheme: CardThemeData(
-      elevation: 0,
-      color: AppColors.surface,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(cardRadius),
-      ),
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-    ),
-
-    // Navigation Bar
-    navigationBarTheme: NavigationBarThemeData(
-      backgroundColor: AppColors.surface,
-      indicatorColor: AppColors.primary.withOpacity(0.15),
-      labelTextStyle: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.selected)) {
-          return GoogleFonts.plusJakartaSans(
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-            color: AppColors.primary,
-          );
-        }
-        return GoogleFonts.plusJakartaSans(
-          fontSize: 12,
-          color: AppColors.textSecondary,
-        );
-      }),
-      iconTheme: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.selected)) {
-          return const IconThemeData(color: AppColors.primary);
-        }
-        return const IconThemeData(color: AppColors.textSecondary);
-      }),
-    ),
-
-    // Divider
-    dividerColor: AppColors.divider,
-    dividerTheme: const DividerThemeData(
-      color: AppColors.divider,
-      thickness: 1,
-    ),
-
-    // Switch
-    switchTheme: SwitchThemeData(
-      thumbColor: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.selected)) {
-          return AppColors.primary;
-        }
-        return AppColors.disabled;
-      }),
-      trackColor: WidgetStateProperty.resolveWith((states) {
-        if (states.contains(WidgetState.selected)) {
-          return AppColors.primary.withOpacity(0.3);
-        }
-        return AppColors.disabled.withOpacity(0.3);
-      }),
-    ),
-
-    // Progress Indicator
-    progressIndicatorTheme: const ProgressIndicatorThemeData(
-      color: AppColors.primary,
-      linearTrackColor: AppColors.divider,
-    ),
-
-    // FAB
-    floatingActionButtonTheme: FloatingActionButtonThemeData(
-      backgroundColor: AppColors.primary,
-      foregroundColor: Colors.white,
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(buttonRadius),
-      ),
-    ),
-  );
-
-  /// Dark theme (optional, keeps consistency)
-  static ThemeData get dark => ThemeData(
-    useMaterial3: true,
-    brightness: Brightness.dark,
-    colorScheme: ColorScheme.dark(
-      primary: AppColors.primary,
-      secondary: AppColors.secondary,
-      tertiary: AppColors.accent,
-      surface: const Color(0xFF1E1E1E),
-      error: AppColors.error,
-    ),
-    scaffoldBackgroundColor: const Color(0xFF121212),
-    textTheme: GoogleFonts.plusJakartaSansTextTheme(ThemeData.dark().textTheme),
-    appBarTheme: AppBarTheme(
-      centerTitle: true,
-      elevation: 0,
-      titleTextStyle: GoogleFonts.plusJakartaSans(
-        fontSize: 20,
-        fontWeight: FontWeight.bold,
-      ),
-    ),
-    cardTheme: CardThemeData(
-      elevation: 0,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(cardRadius),
-      ),
-    ),
-  );
+      appBarTheme: const AppBarTheme(centerTitle: true),
+    );
+  }
 }

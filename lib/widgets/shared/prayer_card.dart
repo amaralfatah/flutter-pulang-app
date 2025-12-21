@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../../app/theme/app_colors.dart';
+import '../../app/extensions/color_scheme_extensions.dart';
 import '../../models/models.dart';
 
 /// Shared Prayer Card Widget - displays prayer with emoji icon and status
@@ -28,77 +28,88 @@ class PrayerCard extends StatelessWidget {
     final isLate = status == PrayerStatus.late;
     final isMissed = status == PrayerStatus.missed;
 
-    // Determine status icon and color
+    final colorScheme = Theme.of(context).colorScheme;
+
+    // Determine status icon and color using semantic extensions
     Color statusBgColor;
     Color statusIconColor;
     IconData statusIcon;
 
     if (isCompleted) {
       statusBgColor = isLate
-          ? AppColors.warning.withOpacity(0.15)
-          : AppColors.success.withOpacity(0.15);
-      statusIconColor = isLate ? AppColors.warning : AppColors.success;
+          ? colorScheme.statusLateContainer
+          : colorScheme.statusOnTimeContainer;
+      statusIconColor = isLate
+          ? colorScheme.onStatusLateContainer
+          : colorScheme.onStatusOnTimeContainer;
       statusIcon = Icons.check_rounded;
     } else if (isMissed) {
-      statusBgColor = AppColors.error.withOpacity(0.15);
-      statusIconColor = AppColors.error;
+      statusBgColor = colorScheme.statusMissedContainer;
+      statusIconColor = colorScheme.onStatusMissedContainer;
       statusIcon = Icons.close_rounded;
     } else {
-      statusBgColor = AppColors.divider.withOpacity(0.5);
-      statusIconColor = AppColors.textSecondary;
+      statusBgColor = colorScheme.surfaceContainerHighest;
+      statusIconColor = colorScheme.onSurfaceVariant;
       statusIcon = Icons.remove_rounded;
     }
 
-    return Container(
+    return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      decoration: BoxDecoration(
-        color: isHighlighted
-            ? AppColors.primary.withOpacity(0.08)
-            : AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Material(
-        color: Colors.transparent,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            child: Row(
-              children: [
-                // Emoji Icon
-                Text(
-                  _getEmoji(prayerName),
-                  style: const TextStyle(fontSize: 32),
+      // Use secondaryContainer for highlight to differentiate from onTime status
+      color: isHighlighted ? colorScheme.secondaryContainer : null,
+      // elevation: isHighlighted ? 0 : 1,
+      shape: isHighlighted
+          ? RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+              side: BorderSide(color: colorScheme.secondary, width: 2),
+            )
+          : null,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(
+            children: [
+              // Prayer Icon
+              Container(
+                // padding: const EdgeInsets.all(12),
+                // decoration: BoxDecoration(
+                //   color: colorScheme.surfaceContainerHighest,
+                //   shape: BoxShape.circle,
+                // ),
+                child: Icon(
+                  _getIcon(prayerName),
+                  color: colorScheme.primary,
+                  size: 24,
                 ),
-                const SizedBox(width: 16),
+              ),
+              const SizedBox(width: 16),
 
-                // Prayer Name & Subtitle
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _getDisplayName(prayerName),
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: AppColors.textPrimary,
-                            ),
+              // Prayer Name & Subtitle
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _getDisplayName(prayerName),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.bold,
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        subtitle ?? _getStatusText(),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: AppColors.textSecondary,
-                        ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle ?? _getStatusText(),
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
+              ),
 
-                // Status Circle Icon
+              // Status Circle Icon - only show if status is set
+              if (status != null)
                 Container(
                   width: 44,
                   height: 44,
@@ -108,27 +119,26 @@ class PrayerCard extends StatelessWidget {
                   ),
                   child: Icon(statusIcon, color: statusIconColor, size: 24),
                 ),
-              ],
-            ),
+            ],
           ),
         ),
       ),
     );
   }
 
-  /// Get emoji for prayer
-  String _getEmoji(PrayerName name) {
+  /// Get icon for prayer
+  IconData _getIcon(PrayerName name) {
     switch (name) {
       case PrayerName.subuh:
-        return '\u{1F319}'; // 🌙 Crescent Moon
+        return Icons.wb_twilight_rounded;
       case PrayerName.dzuhur:
-        return '\u{2600}'; // ☀ Sun
+        return Icons.wb_sunny_rounded;
       case PrayerName.ashar:
-        return '\u{1F31E}'; // 🌞 Sun With Face
+        return Icons.wb_cloudy_rounded;
       case PrayerName.maghrib:
-        return '\u{26C5}'; // ⛅ Sun Behind Cloud
+        return Icons.nights_stay_rounded;
       case PrayerName.isya:
-        return '\u{2B50}'; // ⭐ Star
+        return Icons.bedtime_rounded;
     }
   }
 
