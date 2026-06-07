@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 
 import '../../app/router.dart';
-
 import '../../providers/providers.dart';
 import '../../services/services.dart';
 
@@ -440,7 +440,7 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ),
             title: const Text(
-              'Backup Sekarang',
+              'Backup Data',
               style: TextStyle(fontWeight: FontWeight.w600),
             ),
             subtitle: Text(
@@ -452,7 +452,7 @@ class SettingsScreen extends ConsumerWidget {
                 fontSize: 13,
               ),
             ),
-            onTap: () => _performManualBackup(context, ref),
+            onTap: () => _confirmManualBackup(context, ref),
           ),
           ListTile(
             leading: Container(
@@ -482,6 +482,47 @@ class SettingsScreen extends ConsumerWidget {
         ],
       ],
     );
+  }
+
+  Future<void> _confirmManualBackup(BuildContext context, WidgetRef ref) async {
+    final colorScheme = Theme.of(context).colorScheme;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      useRootNavigator: true,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20.0),
+        ),
+        title: Text(
+          'Backup Sekarang?',
+          style: TextStyle(
+            color: colorScheme.secondary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Text(
+          'Data kamu akan disimpan ke Google Drive.',
+          style: TextStyle(color: colorScheme.onSurface),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(
+              'Batal',
+              style: TextStyle(color: colorScheme.onSurfaceVariant),
+            ),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: colorScheme.primary),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Backup'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true || !context.mounted) return;
+    await _performManualBackup(context, ref);
   }
 
   Future<void> _performManualBackup(BuildContext context, WidgetRef ref) async {
@@ -554,82 +595,206 @@ class SettingsScreen extends ConsumerWidget {
       if (!context.mounted) return;
 
       // Show Selection Dialog on Root Navigator
+      final colorScheme = Theme.of(context).colorScheme;
       showDialog(
         context: context,
         useRootNavigator: true,
-        builder: (dialogContext) => AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(20.0),
-          ),
-          title: Text(
-            'Pilih File Backup',
-            style: TextStyle(
-              color: Theme.of(context).colorScheme.secondary,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: backups.isEmpty
-                ? Text(
-                    'Tidak ada file backup ditemukan.',
-                    style: TextStyle(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  )
-                : ListView.builder(
-                    shrinkWrap: true,
-                    itemCount: backups.length,
-                    itemBuilder: (listContext, index) {
-                      final file = backups[index];
-                      final created = file.createdTime != null
-                          ? file.createdTime!.toLocal().toString().split('.')[0]
-                          : 'Unknown Date';
-                      return ListTile(
-                        title: Text(
-                          'Backup $created',
-                          style: const TextStyle(fontWeight: FontWeight.w600),
-                        ),
-                        subtitle: Text(
-                          file.name ?? 'No Name',
-                          style: TextStyle(
-                            color: Theme.of(
-                              context,
-                            ).colorScheme.onSurfaceVariant,
-                            fontSize: 13,
-                          ),
-                        ),
-                        onTap: () {
-                          final fileId = file.id!;
-                          // Pop Selection Dialog from Root Navigator
-                          Navigator.of(context, rootNavigator: true).pop();
-
-                          // Use stored router and scaffoldMessenger
-                          _confirmRestore(
-                            context,
-                            ref,
-                            fileId,
-                            router,
-                            scaffoldMessenger,
-                            backupService,
-                          );
-                        },
-                      );
-                    },
-                  ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
-              child: Text(
-                'Batal',
-                style: TextStyle(
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+        builder: (dialogContext) {
+          // Local mutable copy so deletions update the list in place.
+          final items = [...backups];
+          return StatefulBuilder(
+            builder: (statefulContext, setDialogState) {
+              return AlertDialog(
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20.0),
                 ),
-              ),
-            ),
-          ],
-        ),
+                title: Text(
+                  'Pilih Backup untuk Dipulihkan',
+                  style: TextStyle(
+                    color: colorScheme.secondary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                content: SizedBox(
+                  width: double.maxFinite,
+                  child: items.isEmpty
+                      ? Text(
+                          'Belum ada backup tersimpan.',
+                          style: TextStyle(color: colorScheme.onSurfaceVariant),
+                        )
+                      : ListView.builder(
+                          shrinkWrap: true,
+                          itemCount: items.length,
+                          itemBuilder: (listContext, index) {
+                            final file = items[index];
+                            final createdLocal = file.createdTime?.toLocal();
+                            final dateLabel = createdLocal != null
+                                ? DateFormat(
+                                    'd MMM yyyy, HH:mm',
+                                    'id_ID',
+                                  ).format(createdLocal)
+                                : 'Tanggal tidak diketahui';
+                            final isLatest = index == 0;
+
+                            return ListTile(
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                              ),
+                              leading: Icon(
+                                Icons.restore_rounded,
+                                color: colorScheme.primary,
+                              ),
+                              title: Text(
+                                dateLabel,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                              subtitle: isLatest
+                                  ? Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Align(
+                                        alignment: Alignment.centerLeft,
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: colorScheme.primaryContainer,
+                                            borderRadius: BorderRadius.circular(
+                                              8,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            'Terbaru',
+                                            style: TextStyle(
+                                              color: colorScheme
+                                                  .onPrimaryContainer,
+                                              fontSize: 11,
+                                              fontWeight: FontWeight.w600,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                    )
+                                  : null,
+                              trailing: IconButton(
+                                icon: Icon(
+                                  Icons.delete_outline_rounded,
+                                  color: colorScheme.error,
+                                ),
+                                tooltip: 'Hapus backup',
+                                onPressed: () async {
+                                  final fileId = file.id;
+                                  if (fileId == null) return;
+
+                                  final confirmed = await showDialog<bool>(
+                                    context: statefulContext,
+                                    useRootNavigator: true,
+                                    builder: (confirmContext) => AlertDialog(
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(
+                                          20.0,
+                                        ),
+                                      ),
+                                      title: Text(
+                                        'Hapus Backup?',
+                                        style: TextStyle(
+                                          color: colorScheme.secondary,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      content: Text(
+                                        'Backup $dateLabel akan dihapus permanen dari Google Drive.',
+                                        style: TextStyle(
+                                          color: colorScheme.onSurface,
+                                        ),
+                                      ),
+                                      actions: [
+                                        TextButton(
+                                          onPressed: () => Navigator.of(
+                                            confirmContext,
+                                          ).pop(false),
+                                          child: Text(
+                                            'Batal',
+                                            style: TextStyle(
+                                              color:
+                                                  colorScheme.onSurfaceVariant,
+                                            ),
+                                          ),
+                                        ),
+                                        TextButton(
+                                          style: TextButton.styleFrom(
+                                            foregroundColor: colorScheme.error,
+                                          ),
+                                          onPressed: () => Navigator.of(
+                                            confirmContext,
+                                          ).pop(true),
+                                          child: const Text('Hapus'),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+
+                                  if (confirmed != true) return;
+
+                                  try {
+                                    await backupService.deleteBackup(fileId);
+                                    setDialogState(() => items.removeAt(index));
+                                    scaffoldMessenger.showSnackBar(
+                                      SnackBar(
+                                        content: const Text('Backup dihapus.'),
+                                        backgroundColor: colorScheme.secondary,
+                                      ),
+                                    );
+                                  } catch (e) {
+                                    scaffoldMessenger.showSnackBar(
+                                      SnackBar(
+                                        content: Text('Gagal menghapus: $e'),
+                                        backgroundColor: colorScheme.error,
+                                      ),
+                                    );
+                                  }
+                                },
+                              ),
+                              onTap: () {
+                                final fileId = file.id;
+                                if (fileId == null) return;
+                                // Pop Selection Dialog from Root Navigator
+                                Navigator.of(
+                                  context,
+                                  rootNavigator: true,
+                                ).pop();
+
+                                _confirmRestore(
+                                  context,
+                                  ref,
+                                  fileId,
+                                  router,
+                                  scaffoldMessenger,
+                                  backupService,
+                                );
+                              },
+                            );
+                          },
+                        ),
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () =>
+                        Navigator.of(context, rootNavigator: true).pop(),
+                    child: Text(
+                      'Batal',
+                      style: TextStyle(color: colorScheme.onSurfaceVariant),
+                    ),
+                  ),
+                ],
+              );
+            },
+          );
+        },
       );
     } catch (e) {
       // Pop Loading Dialog if error

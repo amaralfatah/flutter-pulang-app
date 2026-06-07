@@ -150,6 +150,46 @@ class BackupService {
     // 5. Update local record
     final nowStr = DateTime.now().toString().split('.')[0]; // Simple format
     await _preferencesService.setLastBackupDate(nowStr);
+
+    // 6. Retention: keep only the most recent backups, delete the rest.
+    await _pruneOldBackups(driveApi);
+  }
+
+  /// Maximum number of backup files to retain on Drive.
+  static const int maxBackupsToKeep = 10;
+
+  /// Delete backups beyond [maxBackupsToKeep], keeping the newest ones.
+  /// Best-effort: a failure here must never fail the backup itself.
+  Future<void> _pruneOldBackups(drive.DriveApi driveApi) async {
+    try {
+      final list = await driveApi.files.list(
+        spaces: 'appDataFolder',
+        q: "name contains 'pulang_backup_' and trashed = false",
+        orderBy: 'createdTime desc',
+        $fields: 'files(id, createdTime)',
+      );
+      final files = list.files ?? [];
+      if (files.length <= maxBackupsToKeep) return;
+
+      for (final file in files.sublist(maxBackupsToKeep)) {
+        final id = file.id;
+        if (id != null) {
+          await driveApi.files.delete(id);
+        }
+      }
+    } catch (_) {
+      // Ignore pruning errors; the backup already succeeded.
+    }
+  }
+
+  /// Delete a single backup file by id (used by the restore dialog UI).
+  Future<void> deleteBackup(String fileId) async {
+    if (!_isInitialized) await init();
+    if (_currentUser == null) throw Exception('Not signed in');
+
+    final client = await _getAuthClient();
+    final driveApi = drive.DriveApi(client);
+    await driveApi.files.delete(fileId);
   }
 
   /// Minimum gap between two automatic backups.
