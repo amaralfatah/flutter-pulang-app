@@ -275,30 +275,6 @@ class DatabaseService {
     return stats;
   }
 
-  /// Get history stats (date + completion count + prayer statuses)
-  Future<List<Map<String, dynamic>>> getHistoryStats({
-    int limit = 30,
-    int offset = 0,
-  }) async {
-    final db = await database;
-    final result = await db.rawQuery(
-      '''
-      SELECT date, 
-             COUNT(CASE WHEN status IN ('on_time', 'late') THEN 1 END) as completed_count,
-             GROUP_CONCAT(CASE WHEN status IN ('on_time', 'late') THEN prayer_name END) as completed_prayers,
-             GROUP_CONCAT(CASE WHEN status = 'on_time' THEN prayer_name END) as on_time_prayers,
-             GROUP_CONCAT(CASE WHEN status = 'late' THEN prayer_name END) as late_prayers
-      FROM prayers
-      GROUP BY date
-      ORDER BY date DESC
-      LIMIT ? OFFSET ?
-    ''',
-      [limit, offset],
-    );
-
-    return result;
-  }
-
   /// Get monthly prayer summary (completed count per date for calendar view)
   Future<Map<String, int>> getMonthPrayerSummary(int year, int month) async {
     final db = await database;

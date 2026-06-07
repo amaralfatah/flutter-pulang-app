@@ -2,7 +2,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/models.dart';
 import '../services/services.dart';
-import 'history_provider.dart';
 import 'statistics_provider.dart';
 
 /// Database service provider (singleton)
@@ -44,7 +43,6 @@ final dateChangeServiceProvider = Provider<DateChangeService>((ref) {
       // Invalidate providers when date changes
       ref.invalidate(todayPrayersProvider);
       ref.invalidate(statisticsProvider);
-      ref.invalidate(historyProvider);
     },
   );
 
@@ -171,7 +169,6 @@ class TodayPrayersNotifier extends Notifier<TodayPrayersState> {
       await _loadTodayPrayers();
       // Invalidate dependent providers to refresh their data
       ref.invalidate(statisticsProvider);
-      ref.invalidate(historyProvider);
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }
@@ -184,7 +181,6 @@ class TodayPrayersNotifier extends Notifier<TodayPrayersState> {
       await _loadTodayPrayers();
       // Invalidate dependent providers to refresh their data
       ref.invalidate(statisticsProvider);
-      ref.invalidate(historyProvider);
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }
@@ -197,7 +193,6 @@ class TodayPrayersNotifier extends Notifier<TodayPrayersState> {
       await _loadTodayPrayers();
       // Invalidate dependent providers to refresh their data
       ref.invalidate(statisticsProvider);
-      ref.invalidate(historyProvider);
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }

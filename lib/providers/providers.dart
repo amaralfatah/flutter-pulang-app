@@ -1,7 +1,6 @@
 // Providers barrel file
 // Export all providers from this file for easy imports
 
-export 'history_provider.dart';
 export 'prayer_provider.dart';
 export 'prayer_times_provider.dart';
 export 'settings_provider.dart';

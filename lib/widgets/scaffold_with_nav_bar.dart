@@ -31,11 +31,6 @@ class ScaffoldWithNavBar extends StatelessWidget {
             label: 'Kalender',
           ),
           NavigationDestination(
-            icon: Icon(Icons.history_outlined),
-            selectedIcon: Icon(Icons.history_rounded),
-            label: 'Riwayat',
-          ),
-          NavigationDestination(
             icon: Icon(Icons.settings_outlined),
             selectedIcon: Icon(Icons.settings_rounded),
             label: 'Pengaturan',

@@ -199,7 +199,6 @@ class CalendarNotifier extends Notifier<CalendarState> {
 
       // Invalidate related providers
       ref.invalidate(statisticsProvider);
-      ref.invalidate(historyProvider);
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }
@@ -216,7 +215,6 @@ class CalendarNotifier extends Notifier<CalendarState> {
 
       // Invalidate related providers
       ref.invalidate(statisticsProvider);
-      ref.invalidate(historyProvider);
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }

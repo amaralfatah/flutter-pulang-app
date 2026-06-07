@@ -1,7 +1,6 @@
 import 'package:go_router/go_router.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/statistics/statistics_screen.dart';
-import '../screens/history/history_screen.dart';
 import '../screens/calendar/calendar_screen.dart';
 import '../screens/settings/settings_screen.dart';
 import '../screens/test/google_drive_test_screen.dart';
@@ -12,7 +11,6 @@ class AppRoutes {
   static const home = '/';
   static const statistics = '/statistics';
   static const calendar = '/calendar';
-  static const history = '/history';
   static const settings = '/settings';
   static const driveTest = '/drive-test';
 }
@@ -50,15 +48,6 @@ final router = GoRouter(
               path: AppRoutes.calendar,
               name: 'calendar',
               builder: (context, state) => const CalendarScreen(),
-            ),
-          ],
-        ),
-        StatefulShellBranch(
-          routes: [
-            GoRoute(
-              path: AppRoutes.history,
-              name: 'history',
-              builder: (context, state) => const HistoryScreen(),
             ),
           ],
         ),
