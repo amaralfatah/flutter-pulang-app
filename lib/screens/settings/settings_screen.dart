@@ -999,7 +999,7 @@ class SettingsScreen extends ConsumerWidget {
             ),
           ),
           subtitle: Text(
-            'Hapus semua data dan kembali ke awal',
+            'Hapus data di perangkat (backup Drive tetap aman)',
             style: TextStyle(
               color: Theme.of(context).colorScheme.onSurfaceVariant,
               fontSize: 13,
@@ -1031,7 +1031,9 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ),
         content: Text(
-          'Apakah Anda yakin ingin menghapus SEMUA data solat dan setting? Tindakan ini tidak bisa dibatalkan.',
+          'Ini akan menghapus SEMUA data solat dan setting di perangkat ini. '
+          'Backup di Google Drive TIDAK ikut terhapus, jadi data masih bisa '
+          'dipulihkan lewat Restore. Tindakan ini tidak bisa dibatalkan.',
           style: TextStyle(color: Theme.of(context).colorScheme.onSurface),
         ),
         actions: [
