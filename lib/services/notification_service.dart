@@ -1,16 +1,27 @@
 import 'dart:io';
 
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../models/models.dart';
 
 /// Service for handling push notifications and scheduling alarms
+///
+/// Annotated with `vm:entry-point` because [_alarmCallback] runs in a
+/// background isolate spawned by native code (AndroidAlarmManager). Without
+/// these annotations the AOT compiler tree-shakes the class/constructors and
+/// the alarm callback crashes with "must be annotated" — so the scheduled
+/// notification never actually shows.
+@pragma('vm:entry-point')
 class NotificationService {
+  @pragma('vm:entry-point')
   static final NotificationService _instance = NotificationService._internal();
 
+  @pragma('vm:entry-point')
   factory NotificationService() => _instance;
 
+  @pragma('vm:entry-point')
   NotificationService._internal();
 
   final FlutterLocalNotificationsPlugin _notificationsPlugin =
@@ -127,6 +138,10 @@ class NotificationService {
     if (date.year != now.year ||
         date.month != now.month ||
         date.day != now.day) {
+      debugPrint(
+        '[Notif] Skip schedule: prayer date ${prayerTime.date} != today '
+        '${now.toIso8601String().split('T').first}',
+      );
       return;
     }
 
@@ -139,6 +154,7 @@ class NotificationService {
       ('Isya', prayerTime.isya, 5),
     ];
 
+    var scheduledCount = 0;
     for (final (name, timeStr, id) in prayers) {
       final timeParts = timeStr.split(':');
       final hour = int.parse(timeParts[0]);
@@ -164,8 +180,38 @@ class NotificationService {
           rescheduleOnReboot: true,
           params: {'title': 'Waktu $name', 'body': 'Sudah masuk waktu $name'},
         );
+        scheduledCount++;
+        debugPrint('[Notif] Scheduled $name at $timeStr (id=$id)');
+      } else {
+        debugPrint('[Notif] Skip $name at $timeStr (already passed)');
       }
     }
+    debugPrint('[Notif] Done: $scheduledCount alarm(s) scheduled for today.');
+  }
+
+  /// Schedule a one-off test notification [delay] from now, using the exact
+  /// same AlarmManager path as real prayer alarms. Use this to verify
+  /// end-to-end delivery without waiting for an actual prayer time.
+  ///
+  /// Returns the time the notification is expected to fire.
+  Future<DateTime> scheduleTestNotification({
+    Duration delay = const Duration(minutes: 1),
+  }) async {
+    final fireAt = DateTime.now().add(delay);
+    await AndroidAlarmManager.oneShotAt(
+      fireAt,
+      99, // dedicated test id, outside the 1-5 prayer range
+      _alarmCallback,
+      exact: true,
+      wakeup: true,
+      rescheduleOnReboot: false,
+      params: {
+        'title': 'Test Notifikasi Terjadwal',
+        'body': 'Jika kamu melihat ini, alarm terjadwal berfungsi.',
+      },
+    );
+    debugPrint('[Notif] Test alarm scheduled at ${fireAt.toIso8601String()}');
+    return fireAt;
   }
 
   /// Callback triggered by AlarmManager
@@ -173,6 +219,7 @@ class NotificationService {
   static void _alarmCallback(int id, Map<String, dynamic> params) async {
     final title = params['title'] as String;
     final body = params['body'] as String;
+    debugPrint('[Notif] Alarm fired (id=$id) -> showing "$title"');
 
     // Show notification immediately
     final service = NotificationService();

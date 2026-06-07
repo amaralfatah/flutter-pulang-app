@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../services/services.dart';
 import 'prayer_provider.dart';
+import 'prayer_times_provider.dart';
 
 /// State for app settings
 class SettingsState {
@@ -104,18 +105,13 @@ class SettingsNotifier extends Notifier<SettingsState> {
     state = state.copyWith(notificationEnabled: enabled);
 
     if (enabled) {
-      // Re-schedule will happen on next prayer times refresh or we can trigger it
-      // But we need prayer times data.
-      // Simplified: Just cancel if disabled. Re-enable implies waiting for next fetch
-      // or user can refresh manually.
-      // Ideally we should read prayerTimesProvider and schedule, but avoid circular dependency.
-      // For personal app, wait for next fetch is okay or simple check.
-
-      // We will leave it to auto-schedule on fetch, but ensure permissions are requested
-      if (enabled) {
-        await _notificationService.requestPermissions();
-        // Trigger refresh of prayer times to re-schedule
-        // This is a bit indirect but avoids direct dependency update here
+      // Request permission, then schedule immediately using the prayer times
+      // already loaded — no need to wait for the next fetch. prayerTimesProvider
+      // doesn't depend on settingsProvider, so reading it here is safe.
+      await _notificationService.requestPermissions();
+      final prayerTime = ref.read(prayerTimesProvider).prayerTime;
+      if (prayerTime != null) {
+        await _notificationService.schedulePrayerNotifications(prayerTime);
       }
     } else {
       await _notificationService.cancelAllNotifications();

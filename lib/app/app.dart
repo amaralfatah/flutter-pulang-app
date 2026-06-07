@@ -20,8 +20,24 @@ class _PulangAppState extends ConsumerState<PulangApp> {
     // Runs in the background and is a no-op unless it's actually due
     // (auto-backup enabled, signed in, and >24h since the last backup).
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _ensureNotificationPermission();
       _runAutoBackup();
     });
+  }
+
+  /// Request the notification permission on launch when the user has
+  /// notifications enabled, so prayer alarms can actually be displayed.
+  /// Runs after the first frame so the system dialog appears over the UI.
+  Future<void> _ensureNotificationPermission() async {
+    try {
+      final enabled = await ref
+          .read(preferencesServiceProvider)
+          .isNotificationEnabled();
+      if (!enabled) return;
+      await ref.read(notificationServiceProvider).requestPermissions();
+    } catch (_) {
+      // Permission prompt failures must never disrupt startup.
+    }
   }
 
   Future<void> _runAutoBackup() async {

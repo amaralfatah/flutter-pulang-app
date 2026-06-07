@@ -51,6 +51,8 @@ class PrayerTimesNotifier extends Notifier<PrayerTimesState> {
   PrayerApiService get _prayerApiService => ref.read(prayerApiServiceProvider);
   NotificationService get _notificationService =>
       ref.read(notificationServiceProvider);
+  PreferencesService get _preferencesService =>
+      ref.read(preferencesServiceProvider);
   Timer? _countdownTimer;
   Timer? _dayChangeTimer;
 
@@ -76,12 +78,17 @@ class PrayerTimesNotifier extends Notifier<PrayerTimesState> {
       state = state.copyWith(prayerTime: prayerTime, isLoading: false);
       _updateNextPrayer();
 
-      // Schedule notifications if available
+      // Schedule notifications only if the user has them enabled; otherwise
+      // make sure any previously-scheduled alarms are cleared. Reading the
+      // preference directly (not via settingsProvider) avoids a provider cycle.
       if (prayerTime != null) {
-        // We should check if notifications are enabled in settings, but
-        // for now let the service handle or we can check settingsProvider here.
-        // Better: let's just schedule, and settings toggle will cancel.
-        await _notificationService.schedulePrayerNotifications(prayerTime);
+        final notificationsEnabled = await _preferencesService
+            .isNotificationEnabled();
+        if (notificationsEnabled) {
+          await _notificationService.schedulePrayerNotifications(prayerTime);
+        } else {
+          await _notificationService.cancelAllNotifications();
+        }
       }
     } catch (e) {
       state = state.copyWith(error: e.toString(), isLoading: false);
