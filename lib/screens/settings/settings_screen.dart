@@ -452,24 +452,26 @@ class SettingsScreen extends ConsumerWidget {
             final messenger = ScaffoldMessenger.of(context);
             final errorColor = Theme.of(context).colorScheme.error;
             final isLogin = settings.googleAccountEmail == null;
+
+            // Login uses a dedicated flow that also auto-restores the latest
+            // backup; logout stays a simple sign-out.
+            if (isLogin) {
+              await _signInAndRestore(context, ref);
+              return;
+            }
+
             try {
               await LoadingDialog.run(
                 context,
-                message: isLogin
-                    ? 'Menghubungkan ke Google...'
-                    : 'Keluar dari akun...',
-                task: () =>
-                    isLogin ? backupService.signIn() : backupService.signOut(),
+                message: 'Keluar dari akun...',
+                task: () => backupService.signOut(),
               );
               // Refresh settings to update UI with new account status
               ref.invalidate(settingsProvider);
             } catch (e) {
-              // Sign-in cancellation also lands here; keep the message generic.
               messenger.showSnackBar(
                 SnackBar(
-                  content: Text(
-                    isLogin ? 'Gagal masuk: $e' : 'Gagal keluar: $e',
-                  ),
+                  content: Text('Gagal keluar: $e'),
                   backgroundColor: errorColor,
                 ),
               );
@@ -557,6 +559,137 @@ class SettingsScreen extends ConsumerWidget {
           ),
         ],
       ],
+    );
+  }
+
+  /// Sign in to Google and restore the most recent backup.
+  ///
+  /// Behaviour:
+  /// - No backup on the account (new user) → just login, nothing restored.
+  /// - Local data is empty (fresh install / after reset) → restore silently,
+  ///   no confirmation needed since nothing can be overwritten.
+  /// - Local data already exists → ask for confirmation before overwriting it.
+  Future<void> _signInAndRestore(BuildContext context, WidgetRef ref) async {
+    final backupService = ref.read(backupServiceProvider);
+    final dbService = ref.read(databaseServiceProvider);
+    final messenger = ScaffoldMessenger.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    try {
+      // 1. Sign in, find the latest backup, and check for existing local data.
+      final result = await LoadingDialog.run<({String? latestId, bool hasLocalData})>(
+        context,
+        message: 'Menghubungkan ke Google...',
+        task: () async {
+          await backupService.signIn();
+
+          // listBackups() returns newest-first, so the first entry is latest.
+          final backups = await backupService.listBackups();
+          final latestId = backups.isNotEmpty ? backups.first.id : null;
+
+          final prayers = await dbService.getAllPrayers();
+          return (latestId: latestId, hasLocalData: prayers.isNotEmpty);
+        },
+      );
+
+      // 2. No backup available → login only.
+      if (result.latestId == null) {
+        ref.invalidate(settingsProvider);
+        messenger.showSnackBar(
+          SnackBar(
+            content: const Text(
+              'Login berhasil. Belum ada backup untuk dipulihkan.',
+            ),
+            backgroundColor: colorScheme.primary,
+          ),
+        );
+        return;
+      }
+
+      // 3. Local data exists → confirm before overwriting it.
+      if (result.hasLocalData) {
+        if (!context.mounted) return;
+        final confirmed = await _confirmRestoreOnLogin(context);
+        if (confirmed != true) {
+          ref.invalidate(settingsProvider);
+          messenger.showSnackBar(
+            SnackBar(
+              content: const Text('Login berhasil. Data lokal dipertahankan.'),
+              backgroundColor: colorScheme.primary,
+            ),
+          );
+          return;
+        }
+      }
+
+      // 4. Restore the latest backup.
+      if (!context.mounted) return;
+      await LoadingDialog.run(
+        context,
+        message: 'Memulihkan data backup terbaru...',
+        task: () => backupService.restore(result.latestId!),
+      );
+
+      ref.invalidate(settingsProvider);
+      ref.invalidate(todayPrayersProvider);
+      ref.invalidate(prayerTimesProvider);
+
+      messenger.showSnackBar(
+        SnackBar(
+          content: const Text('Login berhasil & data backup terbaru dipulihkan!'),
+          backgroundColor: colorScheme.primary,
+        ),
+      );
+    } catch (e) {
+      // Login may have succeeded even if a later step failed, so refresh the
+      // account status regardless. Sign-in cancellation also lands here.
+      ref.invalidate(settingsProvider);
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Gagal masuk: $e'),
+          backgroundColor: colorScheme.error,
+        ),
+      );
+    }
+  }
+
+  /// Confirmation shown when login would overwrite existing local data.
+  Future<bool?> _confirmRestoreOnLogin(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return showDialog<bool>(
+      context: context,
+      useRootNavigator: true,
+      builder: (dialogContext) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20.0),
+        ),
+        title: Text(
+          'Pulihkan Data Backup?',
+          style: TextStyle(
+            color: colorScheme.secondary,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        content: Text(
+          'Login berhasil. Kamu sudah punya data di perangkat ini. '
+          'Memulihkan backup terbaru akan MENIMPA data tersebut. Lanjutkan?',
+          style: TextStyle(color: colorScheme.onSurface),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: Text(
+              'Pertahankan Data',
+              style: TextStyle(color: colorScheme.onSurfaceVariant),
+            ),
+          ),
+          TextButton(
+            style: TextButton.styleFrom(foregroundColor: colorScheme.error),
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('Pulihkan'),
+          ),
+        ],
+      ),
     );
   }
 
