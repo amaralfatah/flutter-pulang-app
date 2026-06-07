@@ -36,18 +36,18 @@ final router = GoRouter(
         StatefulShellBranch(
           routes: [
             GoRoute(
-              path: AppRoutes.statistics,
-              name: 'statistics',
-              builder: (context, state) => const StatisticsScreen(),
+              path: AppRoutes.calendar,
+              name: 'calendar',
+              builder: (context, state) => const CalendarScreen(),
             ),
           ],
         ),
         StatefulShellBranch(
           routes: [
             GoRoute(
-              path: AppRoutes.calendar,
-              name: 'calendar',
-              builder: (context, state) => const CalendarScreen(),
+              path: AppRoutes.statistics,
+              name: 'statistics',
+              builder: (context, state) => const StatisticsScreen(),
             ),
           ],
         ),
