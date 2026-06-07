@@ -5,11 +5,38 @@ import 'router.dart';
 import 'theme/app_theme.dart';
 
 /// Main application widget wrapped with Riverpod
-class PulangApp extends ConsumerWidget {
+class PulangApp extends ConsumerStatefulWidget {
   const PulangApp({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<PulangApp> createState() => _PulangAppState();
+}
+
+class _PulangAppState extends ConsumerState<PulangApp> {
+  @override
+  void initState() {
+    super.initState();
+    // Trigger an automatic Google Drive backup once on app launch.
+    // Runs in the background and is a no-op unless it's actually due
+    // (auto-backup enabled, signed in, and >24h since the last backup).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _runAutoBackup();
+    });
+  }
+
+  Future<void> _runAutoBackup() async {
+    try {
+      await ref.read(backupServiceProvider).autoBackupIfDue();
+      if (!mounted) return;
+      // Refresh settings so the "last backup" timestamp updates in the UI.
+      ref.read(settingsProvider.notifier).refresh();
+    } catch (_) {
+      // Silent: an automatic backup must never disrupt app startup.
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
     // Initialize date change service to monitor for day changes
     ref.watch(dateChangeServiceProvider);
 

@@ -20,8 +20,10 @@ class BackupService {
   }) : _databaseService = databaseService,
        _preferencesService = preferencesService;
 
+  // Authorization scopes only. In google_sign_in v7 authentication (identity)
+  // and authorization (API access) are separate steps, so 'email' must NOT be
+  // here — mixing it in breaks the "already granted?" check and re-prompts.
   static const List<String> _driveScopes = [
-    'email', // Required for sign in
     'https://www.googleapis.com/auth/drive.file',
     'https://www.googleapis.com/auth/drive.appdata',
   ];
@@ -75,11 +77,20 @@ class BackupService {
     }
 
     try {
-      if (GoogleSignIn.instance.supportsAuthenticate()) {
-        await GoogleSignIn.instance.authenticate(scopeHint: _driveScopes);
-      } else {
+      if (!GoogleSignIn.instance.supportsAuthenticate()) {
         throw Exception('Sign in not supported on this platform');
       }
+
+      // 1. Authenticate (establishes identity, persisted for silent restore).
+      final account = await GoogleSignIn.instance.authenticate(
+        scopeHint: _driveScopes,
+      );
+      _currentUser = account;
+
+      // 2. Authorize the Drive scopes ONCE, interactively. This grant is
+      // cached by the platform so future sessions can reuse it silently —
+      // this is what stops the app from re-prompting on every restart.
+      await account.authorizationClient.authorizeScopes(_driveScopes);
     } catch (e) {
       // ignore: avoid_print
       print('Sign In Error: $e');
@@ -141,6 +152,54 @@ class BackupService {
     await _preferencesService.setLastBackupDate(nowStr);
   }
 
+  /// Minimum gap between two automatic backups.
+  static const Duration autoBackupInterval = Duration(hours: 24);
+
+  /// Run a backup automatically, but ONLY if all conditions are met:
+  /// - auto-backup is enabled in settings,
+  /// - a Google account is available via silent restore (never prompts),
+  /// - Drive authorization can be obtained silently (never prompts),
+  /// - at least [autoBackupInterval] has passed since the last backup.
+  ///
+  /// Returns true if a backup was actually performed. Safe to call on every
+  /// app launch — it's a no-op when not due.
+  Future<bool> autoBackupIfDue() async {
+    // --- Cheap, local checks FIRST: do not touch Google unless truly needed.
+    // This is what keeps the Credential Manager UI from flashing on every
+    // launch — we only contact Google when a backup is actually due.
+
+    if (!await _preferencesService.isAutoBackupEnabled()) return false;
+
+    // Only proceed if the user has connected an account before. Otherwise
+    // there's nothing to restore and no reason to trigger any sign-in UI.
+    final email = await _preferencesService.getGoogleAccountEmail();
+    if (email == null || email.isEmpty) return false;
+
+    // Skip if we already backed up within the interval window.
+    final lastStr = await _preferencesService.getLastBackupDate();
+    if (lastStr != null) {
+      final last = DateTime.tryParse(lastStr);
+      if (last != null &&
+          DateTime.now().difference(last) < autoBackupInterval) {
+        return false;
+      }
+    }
+
+    // --- Only now do we touch Google (at most once per interval).
+    if (!_isInitialized) await init();
+
+    // Need a restored account; an automatic backup must never show a login UI.
+    if (_currentUser == null) return false;
+
+    // Ensure Drive access can be granted silently; bail (no prompt) otherwise.
+    final authorization = await _currentUser!.authorizationClient
+        .authorizationForScopes(_driveScopes);
+    if (authorization == null) return false;
+
+    await backup();
+    return true;
+  }
+
   /// List available backups
   Future<List<drive.File>> listBackups() async {
     if (!_isInitialized) await init();
@@ -197,39 +256,26 @@ class BackupService {
     }
   }
 
-  /// Helper to get authenticated HTTP client (New v7.2.0 API)
+  /// Helper to get authenticated HTTP client (google_sign_in v7 API).
   Future<AuthClient> _getAuthClient() async {
-    if (_currentUser == null) throw Exception('No user');
+    final user = _currentUser;
+    if (user == null) throw Exception('No user');
 
-    // Retrieve the authorization tokens from the current user using AuthorizationClient
-    final authClient = _currentUser!.authorizationClient;
+    final authClient = user.authorizationClient;
 
-    // Try to get headers, prompting if necessary (IMPORTANT for new users)
-    // We explicitly set promptIfNecessary: true to handle cases where
-    // scopeHint in authenticate() wasn't enough.
-    Map<String, String>? headers = await authClient.authorizationHeaders(
-      _driveScopes,
-      promptIfNecessary: true,
-    );
+    // 1. SILENT first: reuse a previously-granted authorization. After the
+    // user has signed in once, this returns a fresh access token with NO UI,
+    // even across app restarts — so no repeated login prompts.
+    GoogleSignInClientAuthorization? authorization = await authClient
+        .authorizationForScopes(_driveScopes);
 
-    // If still null, try one last force authorization
-    if (headers == null) {
-      try {
-        await authClient.authorizeScopes(_driveScopes);
-        headers = await authClient.authorizationHeaders(_driveScopes);
-      } catch (_) {
-        // Silently fail - the null check below will handle the error
-      }
-    }
+    // 2. Fallback: only prompt if the grant is genuinely missing
+    // (first run, revoked, or scopes changed).
+    authorization ??= await authClient.authorizeScopes(_driveScopes);
 
-    if (headers == null) {
-      // This often happens if the SHA-1 is missing in Console or scopes were rejected.
-      throw Exception(
-        'Failed to get authorization headers. Check SHA-1/Scopes.',
-      );
-    }
-
-    return AuthClient(headers);
+    return AuthClient({
+      'Authorization': 'Bearer ${authorization.accessToken}',
+    });
   }
 }
 
