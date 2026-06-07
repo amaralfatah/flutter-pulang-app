@@ -31,6 +31,11 @@ class ScaffoldWithNavBar extends StatelessWidget {
             label: 'Statistik',
           ),
           NavigationDestination(
+            icon: Icon(Icons.explore_outlined),
+            selectedIcon: Icon(Icons.explore_rounded),
+            label: 'Kiblat',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.settings_outlined),
             selectedIcon: Icon(Icons.settings_rounded),
             label: 'Pengaturan',

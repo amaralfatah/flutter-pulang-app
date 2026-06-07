@@ -3,6 +3,7 @@ import '../screens/home/home_screen.dart';
 import '../screens/statistics/statistics_screen.dart';
 import '../screens/calendar/calendar_screen.dart';
 import '../screens/settings/settings_screen.dart';
+import '../screens/qibla/qibla_screen.dart';
 import '../screens/test/google_drive_test_screen.dart';
 import '../widgets/scaffold_with_nav_bar.dart';
 
@@ -11,6 +12,7 @@ class AppRoutes {
   static const home = '/';
   static const statistics = '/statistics';
   static const calendar = '/calendar';
+  static const qibla = '/qibla';
   static const settings = '/settings';
   static const driveTest = '/drive-test';
 }
@@ -48,6 +50,15 @@ final router = GoRouter(
               path: AppRoutes.statistics,
               name: 'statistics',
               builder: (context, state) => const StatisticsScreen(),
+            ),
+          ],
+        ),
+        StatefulShellBranch(
+          routes: [
+            GoRoute(
+              path: AppRoutes.qibla,
+              name: 'qibla',
+              builder: (context, state) => const QiblaScreen(),
             ),
           ],
         ),
