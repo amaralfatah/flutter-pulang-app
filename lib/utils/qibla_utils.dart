@@ -33,4 +33,21 @@ class QiblaUtils {
   static String formatDegrees(double degrees) {
     return '${normalizeDegrees(degrees).round()}\u00B0';
   }
+
+  /// Full Indonesian name for an 8-point cardinal abbreviation.
+  ///
+  /// Unknown abbreviations are returned unchanged.
+  static String cardinalName(String abbreviation) {
+    const names = {
+      'U': 'Utara',
+      'TL': 'Timur Laut',
+      'T': 'Timur',
+      'TG': 'Tenggara',
+      'S': 'Selatan',
+      'BD': 'Barat Daya',
+      'B': 'Barat',
+      'BL': 'Barat Laut',
+    };
+    return names[abbreviation] ?? abbreviation;
+  }
 }

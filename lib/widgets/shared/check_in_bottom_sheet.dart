@@ -33,10 +33,11 @@ class CheckInBottomSheet extends StatelessWidget {
     return showModalBottomSheet(
       context: context,
       useRootNavigator: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
       isScrollControlled: true,
+      // M3 native drag handle + extra-large (28dp) top corners.
+      showDragHandle: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32.0)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28.0)),
       ),
       builder: (sheetContext) => CheckInBottomSheet(
         prayerName: prayerName,
@@ -63,17 +64,6 @@ class CheckInBottomSheet extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Drag Handle
-            Container(
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: colorScheme.outlineVariant,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(height: 20),
-
             // Title
             Text(
               isEdit ? 'Edit $displayName' : 'Catat $displayName',

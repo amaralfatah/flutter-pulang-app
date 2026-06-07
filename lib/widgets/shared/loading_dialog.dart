@@ -27,10 +27,7 @@ class LoadingDialog {
               borderRadius: BorderRadius.circular(20.0),
             ),
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: 28,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 28),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [

@@ -195,57 +195,66 @@ class CalendarScreen extends ConsumerWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final hasAnyStatus =
         dayStatus != null && dayStatus.statusList.any((s) => s != null);
+    final recordedCount =
+        dayStatus?.statusList.where((s) => s != null).length ?? 0;
 
-    return Container(
-      margin: const EdgeInsets.all(2),
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // Progress ring (5 segments) - show for unselected days with any status
-          if (hasAnyStatus && !isSelected)
-            SizedBox(
-              width: 40,
-              height: 40,
-              child: CustomPaint(
-                painter: _SegmentedRingPainter(
-                  statusList: dayStatus.statusList,
-                  backgroundColor: Theme.of(context).colorScheme.outlineVariant,
-                  strokeWidth: 2.5,
-                  colorScheme: Theme.of(
-                    context,
-                  ).colorScheme, // Pass colorScheme to painter
+    return Semantics(
+      label: hasAnyStatus
+          ? '${date.day}, $recordedCount dari 5 solat tercatat'
+          : '${date.day}',
+      child: Container(
+        margin: const EdgeInsets.all(2),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // Progress ring (5 segments) - show for unselected days with any status
+            if (hasAnyStatus && !isSelected)
+              SizedBox(
+                width: 40,
+                height: 40,
+                child: CustomPaint(
+                  painter: _SegmentedRingPainter(
+                    statusList: dayStatus.statusList,
+                    backgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.outlineVariant,
+                    strokeWidth: 2.5,
+                    colorScheme: Theme.of(
+                      context,
+                    ).colorScheme, // Pass colorScheme to painter
+                  ),
+                ),
+              ),
+
+            // Background circle for today/selected
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: isSelected
+                    ? colorScheme.primary
+                    : isToday
+                    ? colorScheme.primaryContainer
+                    : null,
+              ),
+              alignment: Alignment.center,
+              child: Text(
+                '${date.day}',
+                style: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                  color: isSelected
+                      ? colorScheme.onPrimary
+                      : isToday
+                      ? colorScheme.primary
+                      : colorScheme.onSurface,
+                  fontWeight: (isSelected || isToday)
+                      ? FontWeight.bold
+                      : FontWeight.normal,
                 ),
               ),
             ),
-
-          // Background circle for today/selected
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: isSelected
-                  ? colorScheme.primary
-                  : isToday
-                  ? colorScheme.primaryContainer
-                  : null,
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              '${date.day}',
-              style: Theme.of(context).textTheme.bodyMedium!.copyWith(
-                color: isSelected
-                    ? colorScheme.onPrimary
-                    : isToday
-                    ? colorScheme.primary
-                    : colorScheme.onSurface,
-                fontWeight: (isSelected || isToday)
-                    ? FontWeight.bold
-                    : FontWeight.normal,
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -278,25 +287,21 @@ class CalendarScreen extends ConsumerWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      formattedDate,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    _buildStatusBadge(
-                      context,
-                      totalRecordedCount: totalRecordedCount,
-                      completedCount: completedCount,
-                    ),
-                  ],
+                child: Text(
+                  formattedDate,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
                 ),
+              ),
+              const SizedBox(width: 12),
+              _buildStatusBadge(
+                context,
+                totalRecordedCount: totalRecordedCount,
+                completedCount: completedCount,
               ),
             ],
           ),
@@ -304,13 +309,9 @@ class CalendarScreen extends ConsumerWidget {
 
         // Prayer List
         if (state.isLoading)
-          Padding(
+          const Padding(
             padding: EdgeInsets.all(32),
-            child: Center(
-              child: CircularProgressIndicator(
-                color: Theme.of(context).colorScheme.primary,
-              ),
-            ),
+            child: Center(child: CircularProgressIndicator()),
           )
         else
           _buildPrayerList(context, ref, prayers, selectedDay),
@@ -324,7 +325,7 @@ class CalendarScreen extends ConsumerWidget {
     required int completedCount,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
-    final color = _getProgressColor(
+    final colors = _getProgressColors(
       totalRecordedCount: totalRecordedCount,
       completedCount: completedCount,
       colorScheme: colorScheme,
@@ -339,19 +340,28 @@ class CalendarScreen extends ConsumerWidget {
         ? Icons.circle
         : Icons.radio_button_unchecked;
 
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, color: color, size: 14),
-        const SizedBox(width: 6),
-        Text(
-          text,
-          style: Theme.of(context).textTheme.labelMedium?.copyWith(
-            color: color,
-            fontWeight: FontWeight.w600,
+    // Tonal chip (container + on-container) — matches the badge style on the
+    // Statistics screen so the same status reads as the same colour everywhere.
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: colors.container,
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: colors.onContainer, size: 14),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+              color: colors.onContainer,
+              fontWeight: FontWeight.w600,
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -410,17 +420,41 @@ class CalendarScreen extends ConsumerWidget {
     );
   }
 
-  Color _getProgressColor({
+  /// Tonal (container + on-container) pair for the day-summary badge. Uses the
+  /// same MD3 status containers as the Statistics screen, so "Terlewat" reads
+  /// as the same red (errorContainer) in both menus.
+  ({Color container, Color onContainer}) _getProgressColors({
     required int totalRecordedCount,
     required int completedCount,
     required ColorScheme colorScheme,
   }) {
-    if (completedCount == 5) return colorScheme.statusOnTime; // Success
-    if (completedCount >= 3) return colorScheme.statusLate; // Warning (amber)
-    if (completedCount >= 1) return colorScheme.statusMissed; // Some progress
-    // No completed prayers but has recorded data = all missed
-    if (totalRecordedCount > 0) return colorScheme.statusMissed;
-    return colorScheme.outlineVariant; // No data at all
+    if (completedCount == 5) {
+      // Selesai (hijau)
+      return (
+        container: colorScheme.statusOnTimeContainer,
+        onContainer: colorScheme.onStatusOnTimeContainer,
+      );
+    }
+    // Progress sebagian -> amber (bukan error). `error`/merah hanya untuk
+    // kondisi benar-benar terlewat agar semantik warna M3 tetap benar.
+    if (completedCount >= 1) {
+      return (
+        container: colorScheme.statusLateContainer,
+        onContainer: colorScheme.onStatusLateContainer,
+      );
+    }
+    // Tercatat tapi tidak ada yang selesai = semua terlewat.
+    if (totalRecordedCount > 0) {
+      return (
+        container: colorScheme.statusMissedContainer,
+        onContainer: colorScheme.onStatusMissedContainer,
+      );
+    }
+    // Belum ada data -> netral.
+    return (
+      container: colorScheme.surfaceContainerHighest,
+      onContainer: colorScheme.onSurfaceVariant,
+    );
   }
 
   String _getStatusText({

@@ -28,17 +28,11 @@ class AppTheme {
       onTertiaryContainer: _onWarningContainerLight,
     );
 
-    return ThemeData(
-      useMaterial3: true,
-      colorScheme: colorScheme,
-
-      // Typography - Using GoogleFonts but deferring to M3 hierarchy
-      textTheme: GoogleFonts.interTextTheme(
+    return _build(
+      colorScheme,
+      GoogleFonts.interTextTheme(
         ThemeData(brightness: Brightness.light).textTheme,
       ),
-
-      // App Bar - Centered title for modern app style
-      appBarTheme: const AppBarTheme(centerTitle: true),
     );
   }
 
@@ -57,15 +51,44 @@ class AppTheme {
       onTertiaryContainer: _onWarningContainerDark,
     );
 
+    return _build(
+      colorScheme,
+      GoogleFonts.interTextTheme(
+        ThemeData(brightness: Brightness.dark).textTheme,
+      ),
+    );
+  }
+
+  /// Shared M3 theme assembly so light and dark stay consistent.
+  ///
+  /// Component shapes follow the M3 shape scale (medium = 12dp for cards,
+  /// extra-large = 28dp for dialogs) and are centralised here so individual
+  /// screens never re-declare radii.
+  static ThemeData _build(ColorScheme colorScheme, TextTheme textTheme) {
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
+      textTheme: textTheme,
 
-      textTheme: GoogleFonts.interTextTheme(
-        ThemeData(brightness: Brightness.dark).textTheme,
+      // App Bar - Centered title for modern app style
+      appBarTheme: const AppBarTheme(centerTitle: true),
+
+      // Cards - M3 medium shape (12dp); clip ripples to the rounded corners.
+      cardTheme: CardThemeData(
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       ),
 
-      appBarTheme: const AppBarTheme(centerTitle: true),
+      // Dialogs - M3 extra-large shape (28dp) on the dialog surface tone.
+      dialogTheme: DialogThemeData(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(28)),
+      ),
+
+      // SnackBars - floating per M3 with the small (8dp) shape.
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+      ),
     );
   }
 }

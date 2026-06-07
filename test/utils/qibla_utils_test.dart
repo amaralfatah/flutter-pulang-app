@@ -56,4 +56,15 @@ void main() {
       expect(QiblaUtils.formatDegrees(123.4), '123\u00B0');
     });
   });
+
+  group('cardinalName', () {
+    test('expands known abbreviations', () {
+      expect(QiblaUtils.cardinalName('U'), 'Utara');
+      expect(QiblaUtils.cardinalName('BL'), 'Barat Laut');
+    });
+
+    test('returns unknown abbreviations unchanged', () {
+      expect(QiblaUtils.cardinalName('X'), 'X');
+    });
+  });
 }

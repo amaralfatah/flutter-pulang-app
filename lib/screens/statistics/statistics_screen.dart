@@ -26,10 +26,9 @@ class StatisticsScreen extends ConsumerWidget {
           padding: const EdgeInsets.only(bottom: 24, top: 8),
           children: [
             if (state.isLoading)
-              Center(
-                child: LinearProgressIndicator(
-                  color: Theme.of(context).colorScheme.primary,
-                ),
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16),
+                child: LinearProgressIndicator(),
               )
             else if (state.error != null)
               Card(
@@ -44,56 +43,69 @@ class StatisticsScreen extends ConsumerWidget {
                     ),
                   ),
                 ),
-              ),
+              )
+            else if (totalCompleted == 0)
+              _buildEmptyState(context)
+            else ...[
+              // Weekly Progress Section
+              _buildWeeklyProgressCard(context, weeklyPercentage),
+              const SizedBox(height: 16),
 
-            // Weekly Progress Section
-            _buildWeeklyProgressCard(context, weeklyPercentage),
-            const SizedBox(height: 16),
-
-            // Streak & Total Section
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: _buildStatCard(
-                      context,
-                      title: 'Streak',
-                      value: '$currentStreak',
-                      unit: 'Hari',
-                      icon: Icons.local_fire_department_rounded,
-                      color: Theme.of(context).colorScheme.tertiary,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: _buildStatCard(
-                      context,
-                      title: 'Total Solat',
-                      value: '$totalCompleted',
-                      unit: 'Kali',
-                      icon: Icons.check_circle_rounded,
-                      color: Theme.of(
+              // Streak & Total Section
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _buildStatCard(
                         context,
-                      ).colorScheme.primary, // Success -> Primary
+                        title: 'Streak',
+                        value: '$currentStreak',
+                        unit: 'Hari',
+                        icon: Icons.local_fire_department_rounded,
+                        valueColor: Theme.of(context).colorScheme.tertiary,
+                        containerColor: Theme.of(
+                          context,
+                        ).colorScheme.tertiaryContainer,
+                        onContainerColor: Theme.of(
+                          context,
+                        ).colorScheme.onTertiaryContainer,
+                      ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: _buildStatCard(
+                        context,
+                        title: 'Total Solat',
+                        value: '$totalCompleted',
+                        unit: 'Kali',
+                        icon: Icons.check_circle_rounded,
+                        valueColor: Theme.of(context).colorScheme.primary,
+                        containerColor: Theme.of(
+                          context,
+                        ).colorScheme.primaryContainer,
+                        onContainerColor: Theme.of(
+                          context,
+                        ).colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
+              const SizedBox(height: 24),
 
-            // Detailed Status Section
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: Text(
-                'Detail 7 Hari Terakhir',
-                style: Theme.of(
-                  context,
-                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
+              // Detailed Status Section
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: Text(
+                  'Detail 7 Hari Terakhir',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
-            ),
-            _buildStatusDetailCard(context, state.statusCount),
+              _buildStatusDetailCard(context, state.statusCount),
+            ],
           ],
         ),
       ),
@@ -153,6 +165,8 @@ class StatisticsScreen extends ConsumerWidget {
                 minHeight: 10,
                 backgroundColor: colorScheme.outlineVariant,
                 color: colorScheme.primary,
+                semanticsLabel: 'Konsistensi minggu ini',
+                semanticsValue: '${percentage.toStringAsFixed(1)} persen',
               ),
             ),
             const SizedBox(height: 12),
@@ -174,13 +188,11 @@ class StatisticsScreen extends ConsumerWidget {
     required String value,
     required String unit,
     required IconData icon,
-    required Color color,
+    required Color valueColor,
+    required Color containerColor,
+    required Color onContainerColor,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
-    // Get appropriate container color based on the passed color
-    final containerColor = color == colorScheme.tertiary
-        ? colorScheme.tertiaryContainer
-        : colorScheme.primaryContainer;
 
     return Card(
       child: Padding(
@@ -190,10 +202,10 @@ class StatisticsScreen extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: containerColor.withOpacity(0.5),
+                color: containerColor,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(icon, color: color, size: 24),
+              child: Icon(icon, color: onContainerColor, size: 24),
             ),
             const SizedBox(width: 12),
             Expanded(
@@ -210,7 +222,7 @@ class StatisticsScreen extends ConsumerWidget {
                         style: Theme.of(context).textTheme.headlineSmall
                             ?.copyWith(
                               fontWeight: FontWeight.bold,
-                              color: color,
+                              color: valueColor,
                               height: 1.0,
                             ),
                       ),
@@ -229,7 +241,7 @@ class StatisticsScreen extends ConsumerWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 2),
+                  const SizedBox(height: 4),
                   Text(
                     title,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -303,40 +315,69 @@ class StatisticsScreen extends ConsumerWidget {
     required Color contentColor,
     required IconData icon,
   }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-      child: Row(
-        children: [
-          Container(
-            // padding: const EdgeInsets.all(8),
-            // decoration: BoxDecoration(
-            //   color: containerColor.withOpacity(0.5),
-            //   shape: BoxShape.circle,
-            // ),
-            child: Icon(icon, color: iconColor, size: 20),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Text(
-              label,
-              style: Theme.of(
-                context,
-              ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
-            ),
-          ),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-            decoration: BoxDecoration(
-              color: containerColor,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Text(
-              '$count',
-              style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                color: contentColor,
-                fontWeight: FontWeight.bold,
+    // MergeSemantics so the label and its count are announced as one node
+    // (e.g. "Tepat Waktu, 12") instead of two disconnected nodes.
+    return MergeSemantics(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Row(
+          children: [
+            Icon(icon, color: iconColor, size: 20),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                label,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyLarge?.copyWith(fontWeight: FontWeight.w600),
               ),
             ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              decoration: BoxDecoration(
+                color: containerColor,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '$count',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: contentColor,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Empty state shown when the user has not recorded any prayers yet.
+  Widget _buildEmptyState(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(32, 64, 32, 32),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.insights_rounded,
+            size: 64,
+            color: colorScheme.outlineVariant,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            'Belum ada statistik',
+            style: Theme.of(context).textTheme.titleMedium,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Catat solatmu di Home untuk melihat konsistensi dan streak di sini.',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
+            textAlign: TextAlign.center,
           ),
         ],
       ),

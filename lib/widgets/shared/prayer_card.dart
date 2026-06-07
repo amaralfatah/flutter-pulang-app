@@ -71,19 +71,8 @@ class PrayerCard extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: [
-              // Prayer Icon
-              Container(
-                // padding: const EdgeInsets.all(12),
-                // decoration: BoxDecoration(
-                //   color: colorScheme.surfaceContainerHighest,
-                //   shape: BoxShape.circle,
-                // ),
-                child: Icon(
-                  _getIcon(prayerName),
-                  color: colorScheme.primary,
-                  size: 24,
-                ),
-              ),
+              // Prayer Icon (decorative - the name is announced as text)
+              Icon(_getIcon(prayerName), color: colorScheme.primary, size: 24),
               const SizedBox(width: 16),
 
               // Prayer Name & Subtitle
@@ -108,16 +97,21 @@ class PrayerCard extends StatelessWidget {
                 ),
               ),
 
-              // Status Circle Icon - only show if status is set
+              // Status Circle Icon - only show if status is set.
+              // Wrapped in Semantics so the state is announced, not conveyed
+              // by colour/icon alone (a11y: color-not-only).
               if (status != null)
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: statusBgColor,
-                    shape: BoxShape.circle,
+                Semantics(
+                  label: 'Status: ${_getStatusText()}',
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: statusBgColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(statusIcon, color: statusIconColor, size: 24),
                   ),
-                  child: Icon(statusIcon, color: statusIconColor, size: 24),
                 ),
             ],
           ),

@@ -334,9 +334,7 @@ class BackupService {
     // (first run, revoked, or scopes changed).
     authorization ??= await authClient.authorizeScopes(_driveScopes);
 
-    return AuthClient({
-      'Authorization': 'Bearer ${authorization.accessToken}',
-    });
+    return AuthClient({'Authorization': 'Bearer ${authorization.accessToken}'});
   }
 }
 
