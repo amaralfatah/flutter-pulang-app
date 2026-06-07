@@ -3,9 +3,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import 'package:googleapis/drive/v3.dart' as drive;
+
 import '../../app/router.dart';
 import '../../providers/providers.dart';
 import '../../services/services.dart';
+import '../../widgets/shared/loading_dialog.dart';
 
 /// Settings screen - App configuration
 class SettingsScreen extends ConsumerWidget {
@@ -168,6 +171,61 @@ class SettingsScreen extends ConsumerWidget {
                 ),
               );
             }
+          },
+        ),
+        ListTile(
+          leading: Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.tertiaryContainer,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.schedule_send_outlined,
+              color: Theme.of(context).colorScheme.tertiary,
+            ),
+          ),
+          title: const Text(
+            'Test Notifikasi Terjadwal',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
+          subtitle: Text(
+            'Jadwalkan via alarm, muncul 1 menit lagi (Debug)',
+            style: TextStyle(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+              fontSize: 13,
+            ),
+          ),
+          onTap: () async {
+            final messenger = ScaffoldMessenger.of(context);
+            final secondaryColor = Theme.of(context).colorScheme.secondary;
+            final errorColor = Theme.of(context).colorScheme.error;
+            final service = ref.read(notificationServiceProvider);
+
+            final granted = await service.requestPermissions();
+            if (!granted) {
+              messenger.showSnackBar(
+                SnackBar(
+                  content: const Text(
+                    'Izin notifikasi belum diberikan. Aktifkan di pengaturan HP.',
+                  ),
+                  backgroundColor: errorColor,
+                ),
+              );
+              return;
+            }
+
+            final fireAt = await service.scheduleTestNotification();
+            final timeLabel = DateFormat('HH:mm:ss').format(fireAt);
+            messenger.showSnackBar(
+              SnackBar(
+                content: Text(
+                  'Alarm dijadwalkan pukul $timeLabel. '
+                  'Biarkan/keluar app, notifikasi akan muncul.',
+                ),
+                backgroundColor: secondaryColor,
+              ),
+            );
           },
         ),
       ],
@@ -391,13 +449,31 @@ class SettingsScreen extends ConsumerWidget {
                   color: Theme.of(context).colorScheme.error,
                 ),
           onTap: () async {
-            if (settings.googleAccountEmail == null) {
-              await backupService.signIn();
-            } else {
-              await backupService.signOut();
+            final messenger = ScaffoldMessenger.of(context);
+            final errorColor = Theme.of(context).colorScheme.error;
+            final isLogin = settings.googleAccountEmail == null;
+            try {
+              await LoadingDialog.run(
+                context,
+                message: isLogin
+                    ? 'Menghubungkan ke Google...'
+                    : 'Keluar dari akun...',
+                task: () =>
+                    isLogin ? backupService.signIn() : backupService.signOut(),
+              );
+              // Refresh settings to update UI with new account status
+              ref.invalidate(settingsProvider);
+            } catch (e) {
+              // Sign-in cancellation also lands here; keep the message generic.
+              messenger.showSnackBar(
+                SnackBar(
+                  content: Text(
+                    isLogin ? 'Gagal masuk: $e' : 'Gagal keluar: $e',
+                  ),
+                  backgroundColor: errorColor,
+                ),
+              );
             }
-            // Refresh settings to update UI with new account status
-            ref.invalidate(settingsProvider);
           },
         ),
         if (settings.googleAccountEmail != null) ...[
@@ -528,38 +604,33 @@ class SettingsScreen extends ConsumerWidget {
   Future<void> _performManualBackup(BuildContext context, WidgetRef ref) async {
     final backupService = ref.read(backupServiceProvider);
     final notifier = ref.read(settingsProvider.notifier);
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('Sedang melakukan backup...'),
-        backgroundColor: Theme.of(context).colorScheme.secondary,
-      ),
-    );
+    final messenger = ScaffoldMessenger.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
 
     try {
-      await backupService.init();
-      await backupService.backup();
-      await notifier.refresh();
+      await LoadingDialog.run(
+        context,
+        message: 'Sedang melakukan backup...',
+        task: () async {
+          await backupService.init();
+          await backupService.backup();
+          await notifier.refresh();
+        },
+      );
 
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: const Text('Backup berhasil!'),
-            backgroundColor: Theme.of(
-              context,
-            ).colorScheme.primary, // success -> primary
-          ),
-        );
-      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: const Text('Backup berhasil!'),
+          backgroundColor: colorScheme.primary, // success -> primary
+        ),
+      );
     } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Gagal backup: $e'),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
-      }
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text('Gagal backup: $e'),
+          backgroundColor: colorScheme.error,
+        ),
+      );
     }
   }
 
@@ -572,25 +643,12 @@ class SettingsScreen extends ConsumerWidget {
     await backupService.init();
     if (!context.mounted) return;
 
-    // Show Loading Dialog on Root Navigator
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      useRootNavigator: true,
-      builder: (ctx) => Center(
-        child: CircularProgressIndicator(
-          color: Theme.of(context).colorScheme.primary,
-        ),
-      ),
-    );
-
     try {
-      final backups = await backupService.listBackups();
-
-      // Pop Loading Dialog from Root Navigator
-      if (context.mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
-      }
+      final List<drive.File> backups = await LoadingDialog.run(
+        context,
+        message: 'Memuat daftar backup...',
+        task: () => backupService.listBackups(),
+      );
 
       if (!context.mounted) return;
 
@@ -797,11 +855,6 @@ class SettingsScreen extends ConsumerWidget {
         },
       );
     } catch (e) {
-      // Pop Loading Dialog if error
-      if (context.mounted) {
-        Navigator.of(context, rootNavigator: true).pop();
-      }
-
       scaffoldMessenger.showSnackBar(
         SnackBar(
           content: Text('Gagal mengambil list backup: $e'),
@@ -854,19 +907,16 @@ class SettingsScreen extends ConsumerWidget {
             onPressed: () async {
               Navigator.of(context, rootNavigator: true).pop();
 
-              scaffoldMessenger.showSnackBar(
-                SnackBar(
-                  content: const Text('Sedang me-restore data...'),
-                  backgroundColor: Theme.of(context).colorScheme.secondary,
-                ),
-              );
-
               // Capture colors before async operations
               final primaryColor = Theme.of(context).colorScheme.primary;
               final errorColor = Theme.of(context).colorScheme.error;
 
               try {
-                await backupService.restore(fileId);
+                await LoadingDialog.run(
+                  context,
+                  message: 'Sedang memulihkan data...',
+                  task: () => backupService.restore(fileId),
+                );
 
                 ref.invalidate(settingsProvider);
                 ref.invalidate(todayPrayersProvider);

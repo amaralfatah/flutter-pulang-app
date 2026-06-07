@@ -98,9 +98,30 @@ class BackupService {
     }
   }
 
-  /// Sign out
+  /// Sign out and fully disconnect the Google account.
+  ///
+  /// Uses disconnect() (not signOut()) so the authorization grant is revoked
+  /// and the account is NOT silently restored by attemptLightweightAuthentication()
+  /// on the next launch — otherwise the logout wouldn't "stick".
+  ///
+  /// Local state (current user + persisted email) is cleared synchronously so
+  /// the UI updates immediately, instead of waiting for the asynchronous
+  /// authenticationEvents callback (which fires after the caller already
+  /// re-read settings, making it look like logout did nothing).
   Future<void> signOut() async {
-    await GoogleSignIn.instance.signOut();
+    if (!_isInitialized) await init();
+
+    try {
+      await GoogleSignIn.instance.disconnect();
+    } catch (e) {
+      // Even if the remote revoke fails (e.g. no network), still clear local
+      // state below so the user is logged out from the app's perspective.
+      // ignore: avoid_print
+      print('Sign Out Error: $e');
+    }
+
+    _currentUser = null;
+    await _preferencesService.setGoogleAccountEmail(null);
   }
 
   /// Get current user
