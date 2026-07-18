@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
+import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'package:googleapis/drive/v3.dart' as drive;
 import 'package:http/http.dart' as http;
@@ -35,15 +37,20 @@ class BackupService {
   GoogleSignInAccount? _currentUser;
   bool _isInitialized = false;
 
-  /// Initialize and check persistent auth
+  /// Initialize the Google Sign-In singleton and event listeners.
+  ///
+  /// Deliberately does NOT call attemptLightweightAuthentication(): on Android
+  /// that goes through Credential Manager, which briefly flashes its own
+  /// bottom sheet even for a "silent" restore. We never need authentication at
+  /// startup — Drive access only needs an authorization token, which
+  /// [_getAuthClient] obtains silently without any Credential Manager UI.
+  /// Interactive authentication happens only in [signIn] (user-initiated).
   Future<void> init() async {
     if (_isInitialized) return;
 
     try {
-      // 1. Initialize Singleton
       await GoogleSignIn.instance.initialize(serverClientId: _serverClientId);
 
-      // 2. Listen for auth events
       GoogleSignIn.instance.authenticationEvents.listen((event) {
         if (event is GoogleSignInAuthenticationEventSignIn) {
           _currentUser = event.user;
@@ -53,18 +60,8 @@ class BackupService {
           _preferencesService.setGoogleAccountEmail(null);
         }
       });
-
-      // 3. Try silent sign-in (now attemptLightweightAuthentication)
-      final result = await GoogleSignIn.instance
-          .attemptLightweightAuthentication();
-
-      if (result != null) {
-        _currentUser = result;
-        await _preferencesService.setGoogleAccountEmail(result.email);
-      }
     } catch (e) {
-      // ignore: avoid_print
-      print('BackupService Init Error: $e');
+      debugPrint('BackupService Init Error: $e');
     }
     _isInitialized = true;
   }
@@ -87,13 +84,17 @@ class BackupService {
       );
       _currentUser = account;
 
+      // Persist the email synchronously — the authenticationEvents listener
+      // also does this, but asynchronously, and callers (e.g. sign-in +
+      // restore flow) may check the signed-in state immediately after.
+      await _preferencesService.setGoogleAccountEmail(account.email);
+
       // 2. Authorize the Drive scopes ONCE, interactively. This grant is
       // cached by the platform so future sessions can reuse it silently —
       // this is what stops the app from re-prompting on every restart.
       await account.authorizationClient.authorizeScopes(_driveScopes);
     } catch (e) {
-      // ignore: avoid_print
-      print('Sign In Error: $e');
+      debugPrint('Sign In Error: $e');
       rethrow;
     }
   }
@@ -116,8 +117,7 @@ class BackupService {
     } catch (e) {
       // Even if the remote revoke fails (e.g. no network), still clear local
       // state below so the user is logged out from the app's perspective.
-      // ignore: avoid_print
-      print('Sign Out Error: $e');
+      debugPrint('Sign Out Error: $e');
     }
 
     _currentUser = null;
@@ -127,14 +127,30 @@ class BackupService {
   /// Get current user
   GoogleSignInAccount? get currentUser => _currentUser;
 
-  /// Perform Backup
-  Future<void> backup() async {
+  /// Whether a Google account has been connected before. This is the
+  /// "signed in" gate for Drive operations: identity comes from the stored
+  /// email, and API access from the platform-cached authorization grant —
+  /// neither requires re-authenticating (and thus no Credential Manager UI).
+  Future<bool> _hasConnectedAccount() async {
+    if (_currentUser != null) return true;
+    final email = await _preferencesService.getGoogleAccountEmail();
+    return email != null && email.isNotEmpty;
+  }
+
+  Future<void> _ensureSignedIn() async {
     if (!_isInitialized) await init();
+    if (!await _hasConnectedAccount()) throw Exception('Not signed in');
+  }
 
-    if (_currentUser == null) throw Exception('Not signed in');
+  /// Perform Backup (interactive context: may prompt to re-authorize if the
+  /// cached grant was revoked).
+  Future<void> backup() async {
+    await _ensureSignedIn();
+    await _performBackup(await _requireAuthClient());
+  }
 
-    // 1. Get Auth Client
-    final client = await _getAuthClient();
+  /// Upload a backup using an already-authorized [client].
+  Future<void> _performBackup(AuthClient client) async {
     final driveApi = drive.DriveApi(client);
 
     // 2. Prepare Data
@@ -205,10 +221,8 @@ class BackupService {
 
   /// Delete a single backup file by id (used by the restore dialog UI).
   Future<void> deleteBackup(String fileId) async {
-    if (!_isInitialized) await init();
-    if (_currentUser == null) throw Exception('Not signed in');
-
-    final client = await _getAuthClient();
+    await _ensureSignedIn();
+    final client = await _requireAuthClient();
     final driveApi = drive.DriveApi(client);
     await driveApi.files.delete(fileId);
   }
@@ -218,21 +232,18 @@ class BackupService {
 
   /// Run a backup automatically, but ONLY if all conditions are met:
   /// - auto-backup is enabled in settings,
-  /// - a Google account is available via silent restore (never prompts),
-  /// - Drive authorization can be obtained silently (never prompts),
+  /// - a Google account was connected before (stored email),
+  /// - Drive authorization can be obtained silently (never prompts, no UI),
   /// - at least [autoBackupInterval] has passed since the last backup.
   ///
   /// Returns true if a backup was actually performed. Safe to call on every
-  /// app launch — it's a no-op when not due.
+  /// app launch or from a background alarm — it never shows any UI.
   Future<bool> autoBackupIfDue() async {
     // --- Cheap, local checks FIRST: do not touch Google unless truly needed.
-    // This is what keeps the Credential Manager UI from flashing on every
-    // launch — we only contact Google when a backup is actually due.
 
     if (!await _preferencesService.isAutoBackupEnabled()) return false;
 
-    // Only proceed if the user has connected an account before. Otherwise
-    // there's nothing to restore and no reason to trigger any sign-in UI.
+    // Only proceed if the user has connected an account before.
     final email = await _preferencesService.getGoogleAccountEmail();
     if (email == null || email.isEmpty) return false;
 
@@ -249,25 +260,61 @@ class BackupService {
     // --- Only now do we touch Google (at most once per interval).
     if (!_isInitialized) await init();
 
-    // Need a restored account; an automatic backup must never show a login UI.
-    if (_currentUser == null) return false;
+    // Silent authorization ONLY — this is a pure token fetch through the
+    // platform's Authorization API, NOT Credential Manager authentication,
+    // so no bottom sheet can appear. Bail out quietly if the grant is gone.
+    final client = await _getAuthClient(allowInteraction: false);
+    if (client == null) return false;
 
-    // Ensure Drive access can be granted silently; bail (no prompt) otherwise.
-    final authorization = await _currentUser!.authorizationClient
-        .authorizationForScopes(_driveScopes);
-    if (authorization == null) return false;
-
-    await backup();
+    await _performBackup(client);
     return true;
+  }
+
+  /// Alarm id for the daily background auto-backup
+  /// (prayer alarms use 1-5, the test notification uses 99).
+  static const int autoBackupAlarmId = 90;
+
+  /// Schedule the daily background auto-backup, WhatsApp-style: it runs via
+  /// AlarmManager even when the app is not open. Inexact + no wakeup so the
+  /// system batches it cheaply; [autoBackupIfDue] re-checks all conditions
+  /// (and the 24h window) inside the callback, so firing is always safe.
+  static Future<void> scheduleDailyAutoBackup() async {
+    if (!Platform.isAndroid) return;
+    try {
+      await AndroidAlarmManager.periodic(
+        autoBackupInterval,
+        autoBackupAlarmId,
+        _backgroundBackupCallback,
+        exact: false,
+        wakeup: false,
+        rescheduleOnReboot: true,
+      );
+    } catch (e) {
+      debugPrint('Auto-backup scheduling error: $e');
+    }
+  }
+
+  /// Entry point invoked by AlarmManager in a background isolate. Must build
+  /// its own service instances — nothing from the UI isolate is available.
+  @pragma('vm:entry-point')
+  static Future<void> _backgroundBackupCallback() async {
+    try {
+      final service = BackupService(
+        databaseService: DatabaseService(),
+        preferencesService: PreferencesService(),
+      );
+      await service.autoBackupIfDue();
+    } catch (e) {
+      // A background backup must never crash the isolate; just log and retry
+      // on the next alarm.
+      debugPrint('Background backup error: $e');
+    }
   }
 
   /// List available backups
   Future<List<drive.File>> listBackups() async {
-    if (!_isInitialized) await init();
-
-    if (_currentUser == null) throw Exception('Not signed in');
-
-    final client = await _getAuthClient();
+    await _ensureSignedIn();
+    final client = await _requireAuthClient();
     final driveApi = drive.DriveApi(client);
 
     final fileList = await driveApi.files.list(
@@ -282,11 +329,8 @@ class BackupService {
 
   /// Restore from a specific file
   Future<void> restore(String fileId) async {
-    if (!_isInitialized) await init();
-
-    if (_currentUser == null) throw Exception('Not signed in');
-
-    final client = await _getAuthClient();
+    await _ensureSignedIn();
+    final client = await _requireAuthClient();
     final driveApi = drive.DriveApi(client);
 
     // 1. Download file
@@ -317,24 +361,51 @@ class BackupService {
     }
   }
 
-  /// Helper to get authenticated HTTP client (google_sign_in v7 API).
-  Future<AuthClient> _getAuthClient() async {
-    final user = _currentUser;
-    if (user == null) throw Exception('No user');
+  /// Get an authorized HTTP client for the Drive API.
+  ///
+  /// This is authorization-only (a token fetch), NOT authentication — it never
+  /// goes through Credential Manager, so the silent path shows zero UI.
+  /// Works even when [_currentUser] is null: the account-less
+  /// [GoogleSignIn.authorizationClient] resolves the previously-authorized
+  /// account from the platform-cached grant, which is how a backup can run
+  /// silently after an app restart (or in a background isolate) without ever
+  /// re-authenticating.
+  ///
+  /// With [allowInteraction] false, returns null when no cached grant exists
+  /// instead of prompting — required for automatic/background backups.
+  Future<AuthClient?> _getAuthClient({bool allowInteraction = true}) async {
+    if (!_isInitialized) await init();
 
-    final authClient = user.authorizationClient;
+    // Prefer the account-bound client right after an interactive sign-in;
+    // fall back to the account-less one for restored sessions.
+    final authClient =
+        _currentUser?.authorizationClient ??
+        GoogleSignIn.instance.authorizationClient;
 
-    // 1. SILENT first: reuse a previously-granted authorization. After the
+    // 1. SILENT first: reuse the previously-granted authorization. After the
     // user has signed in once, this returns a fresh access token with NO UI,
-    // even across app restarts — so no repeated login prompts.
+    // even across app restarts.
     GoogleSignInClientAuthorization? authorization = await authClient
         .authorizationForScopes(_driveScopes);
 
-    // 2. Fallback: only prompt if the grant is genuinely missing
-    // (first run, revoked, or scopes changed).
-    authorization ??= await authClient.authorizeScopes(_driveScopes);
+    // 2. Fallback: only prompt if the grant is genuinely missing (revoked or
+    // scopes changed) — and only in user-initiated (interactive) contexts.
+    if (authorization == null && allowInteraction) {
+      authorization = await authClient.authorizeScopes(_driveScopes);
+    }
+    if (authorization == null) return null;
 
     return AuthClient({'Authorization': 'Bearer ${authorization.accessToken}'});
+  }
+
+  /// Interactive variant of [_getAuthClient] for user-initiated operations,
+  /// where a missing grant is an error rather than a silent no-op.
+  Future<AuthClient> _requireAuthClient() async {
+    final client = await _getAuthClient();
+    if (client == null) {
+      throw Exception('Gagal mendapat izin akses Google Drive');
+    }
+    return client;
   }
 }
 

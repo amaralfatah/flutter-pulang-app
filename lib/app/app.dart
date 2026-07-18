@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/providers.dart';
+import '../services/services.dart';
 import 'router.dart';
 import 'theme/app_theme.dart';
 
@@ -42,6 +43,12 @@ class _PulangAppState extends ConsumerState<PulangApp> {
 
   Future<void> _runAutoBackup() async {
     try {
+      // Daily WhatsApp-style background backup via AlarmManager, so backups
+      // also happen when the app isn't opened. The callback re-checks all
+      // conditions itself, so scheduling unconditionally here is safe.
+      await BackupService.scheduleDailyAutoBackup();
+
+      // Catch-up pass on launch (fully silent — no Credential Manager UI).
       await ref.read(backupServiceProvider).autoBackupIfDue();
       if (!mounted) return;
       // Refresh settings so the "last backup" timestamp updates in the UI.
