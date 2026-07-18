@@ -36,6 +36,11 @@ class _PulangAppState extends ConsumerState<PulangApp> {
           .isNotificationEnabled();
       if (!enabled) return;
       await ref.read(notificationServiceProvider).requestPermissions();
+
+      // Daily background alarm that re-schedules prayer notifications even
+      // on days the app is never opened — the in-memory midnight Timer in
+      // PrayerTimesNotifier only re-schedules while the app process is alive.
+      await NotificationService.scheduleDailyReschedule();
     } catch (_) {
       // Permission prompt failures must never disrupt startup.
     }

@@ -113,6 +113,9 @@ class SettingsNotifier extends Notifier<SettingsState> {
       if (prayerTime != null) {
         await _notificationService.schedulePrayerNotifications(prayerTime);
       }
+      // Also arm the daily background rescheduler, in case the user enables
+      // this without an app restart (app.dart only schedules it on launch).
+      await NotificationService.scheduleDailyReschedule();
     } else {
       await _notificationService.cancelAllNotifications();
     }

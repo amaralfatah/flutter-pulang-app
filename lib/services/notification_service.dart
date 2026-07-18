@@ -5,6 +5,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 import '../models/models.dart';
+import 'preferences_service.dart';
+import 'prayer_api_service.dart';
 
 /// Service for handling push notifications and scheduling alarms
 ///
@@ -235,6 +237,67 @@ class NotificationService {
     // IDs 1-5 reserved for daily prayers
     for (int i = 1; i <= 5; i++) {
       await AndroidAlarmManager.cancel(i);
+    }
+  }
+
+  /// Alarm id for the daily midnight rescheduler.
+  static const int rescheduleAlarmId = 80;
+
+  /// Schedule a daily alarm shortly after midnight that re-schedules today's
+  /// prayer notifications from the background, independent of the app being
+  /// opened.
+  ///
+  /// Without this, [schedulePrayerNotifications] only ever runs when
+  /// [prayerTimesProvider] loads (i.e. the app is opened) — so a day the user
+  /// never opens the app has zero alarms scheduled and no prayer
+  /// notifications fire at all. AndroidAlarmManager.periodic survives across
+  /// app restarts/kills (unlike the in-memory midnight Timer in
+  /// PrayerTimesNotifier), which is what makes this work unattended.
+  static Future<void> scheduleDailyReschedule() async {
+    if (!Platform.isAndroid) return;
+    try {
+      await AndroidAlarmManager.periodic(
+        const Duration(days: 1),
+        rescheduleAlarmId,
+        _rescheduleCallback,
+        startAt: _nextMidnightPlus(const Duration(minutes: 5)),
+        exact: false,
+        wakeup: true,
+        rescheduleOnReboot: true,
+      );
+    } catch (e) {
+      debugPrint('[Notif] Reschedule alarm setup error: $e');
+    }
+  }
+
+  static DateTime _nextMidnightPlus(Duration offset) {
+    final now = DateTime.now();
+    final nextMidnight = DateTime(now.year, now.month, now.day + 1);
+    return nextMidnight.add(offset);
+  }
+
+  /// Entry point invoked by AlarmManager in a background isolate. Must build
+  /// its own service instances — nothing from the UI isolate is available.
+  @pragma('vm:entry-point')
+  static Future<void> _rescheduleCallback(
+    int id,
+    Map<String, dynamic> params,
+  ) async {
+    try {
+      final preferencesService = PreferencesService();
+      if (!await preferencesService.isNotificationEnabled()) return;
+
+      final prayerApiService = PrayerApiService(
+        preferencesService: preferencesService,
+      );
+      final prayerTime = await prayerApiService.getTodayPrayerTimes();
+      if (prayerTime == null) return; // offline/no city: app will catch up
+
+      await NotificationService().schedulePrayerNotifications(prayerTime);
+    } catch (e) {
+      // A background reschedule must never crash the isolate; the app will
+      // still catch up next time it's opened.
+      debugPrint('[Notif] Background reschedule error: $e');
     }
   }
 }
