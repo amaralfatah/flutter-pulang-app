@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:go_router/go_router.dart';
 import '../screens/home/home_screen.dart';
 import '../screens/statistics/statistics_screen.dart';
@@ -73,10 +74,12 @@ final router = GoRouter(
         ),
       ],
     ),
-    GoRoute(
-      path: AppRoutes.driveTest,
-      name: 'driveTest',
-      builder: (context, state) => const GoogleDriveTestScreen(),
-    ),
+    // Developer-only diagnostics screen; no UI links to it in a release build.
+    if (kDebugMode)
+      GoRoute(
+        path: AppRoutes.driveTest,
+        name: 'driveTest',
+        builder: (context, state) => const GoogleDriveTestScreen(),
+      ),
   ],
 );

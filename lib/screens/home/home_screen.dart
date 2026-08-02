@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../app/router.dart';
 import '../../models/models.dart';
 import '../../providers/providers.dart';
 import '../../widgets/home/prayer_timer_card.dart';
@@ -95,8 +97,14 @@ class HomeScreen extends ConsumerWidget {
 
             const SizedBox(height: 12),
 
-            // Prayer List
-            if (prayerTimesState.prayerTime == null)
+            // Prayer List — each load state gets its own treatment so the
+            // screen never shows "tidak tersedia" while it is still loading,
+            // nor blames a missing city for what is actually a network error.
+            if (prayerTimesState.isLoading)
+              _buildLoadingState(context)
+            else if (prayerTimesState.error != null)
+              _buildErrorState(context, prayerTimesNotifier)
+            else if (prayerTimesState.prayerTime == null)
               _buildEmptyState(context)
             else
               ..._buildPrayerList(
@@ -117,45 +125,152 @@ class HomeScreen extends ConsumerWidget {
     final now = DateTime.now();
     final dateStr = DateFormat('EEEE, d MMMM yyyy', 'id_ID').format(now);
 
+    // The location line doubles as the way to change it, so it stays tappable
+    // even once a city is set — otherwise "Pilih Kota" reads as a dead end.
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Location & Date
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Location
-                Row(
+      padding: const EdgeInsets.symmetric(horizontal: 8),
+      child: InkWell(
+        onTap: () => context.go(AppRoutes.settings),
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Location & Date
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Icon(
-                      Icons.location_on_rounded,
-                      color: Theme.of(context).colorScheme.primary,
-                      size: 18,
+                    // Location
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.location_on_rounded,
+                          color: Theme.of(context).colorScheme.primary,
+                          size: 18,
+                        ),
+                        const SizedBox(width: 6),
+                        Flexible(
+                          child: Text(
+                            settings.cityName ?? 'Pilih Kota',
+                            style: Theme.of(context).textTheme.titleMedium
+                                ?.copyWith(fontWeight: FontWeight.bold),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        const SizedBox(width: 4),
+                        Icon(
+                          Icons.expand_more_rounded,
+                          size: 18,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: 6),
-                    Flexible(
-                      child: Text(
-                        settings.cityName ?? 'Pilih Kota',
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
-                        overflow: TextOverflow.ellipsis,
+                    const SizedBox(height: 4),
+                    // Date
+                    Text(
+                      dateStr,
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                // Date
-                Text(
-                  dateStr,
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Placeholder rows shown while the schedule is still being fetched, so the
+  /// list keeps its final shape instead of collapsing to a message.
+  Widget _buildLoadingState(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Column(
+      children: List.generate(5, (_) {
+        return Card(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 96,
+                        height: 14,
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Container(
+                        width: 56,
+                        height: 10,
+                        decoration: BoxDecoration(
+                          color: colorScheme.surfaceContainerHighest,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
             ),
+          ),
+        );
+      }),
+    );
+  }
+
+  /// Load failure is a different problem from "no city picked" — offer a retry
+  /// instead of sending the user to Pengaturan for something already set.
+  Widget _buildErrorState(
+    BuildContext context,
+    PrayerTimesNotifier notifier,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(32, 32, 32, 16),
+      child: Column(
+        children: [
+          Icon(Icons.cloud_off_rounded, size: 64, color: colorScheme.error),
+          const SizedBox(height: 16),
+          Text(
+            'Gagal memuat jadwal solat',
+            style: Theme.of(context).textTheme.titleMedium,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Periksa koneksi internet lalu coba lagi.',
+            style: Theme.of(
+              context,
+            ).textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 24),
+          FilledButton.icon(
+            onPressed: notifier.refresh,
+            icon: const Icon(Icons.refresh_rounded),
+            label: const Text('Coba lagi'),
           ),
         ],
       ),
@@ -164,9 +279,8 @@ class HomeScreen extends ConsumerWidget {
 
   Widget _buildEmptyState(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      height: 200,
-      alignment: Alignment.center,
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(32, 32, 32, 16),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
@@ -175,19 +289,26 @@ class HomeScreen extends ConsumerWidget {
             size: 64,
             color: colorScheme.outlineVariant,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Text(
             'Jadwal solat tidak tersedia',
+            style: Theme.of(context).textTheme.titleMedium,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Pilih kota terlebih dahulu supaya jadwal bisa dimuat.',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
+            textAlign: TextAlign.center,
           ),
-          const SizedBox(height: 4),
-          Text(
-            'Pilih kota di Pengaturan',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-            ),
+          const SizedBox(height: 24),
+          // An empty state without a way out forces the user to go hunting.
+          FilledButton.icon(
+            onPressed: () => context.go(AppRoutes.settings),
+            icon: const Icon(Icons.location_on_outlined),
+            label: const Text('Pilih kota'),
           ),
         ],
       ),

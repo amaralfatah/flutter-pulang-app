@@ -144,7 +144,9 @@ class PrayerTimerCard extends ConsumerWidget {
   }
 
   String _getCountdownText(Duration? duration) {
-    if (duration == null) return 'Selesai hari ini';
+    // Only reachable when the schedule time could not be parsed; the
+    // all-prayers-passed case now counts down to tomorrow's Subuh.
+    if (duration == null) return 'Waktu tidak diketahui';
 
     final hours = duration.inHours;
     final minutes = duration.inMinutes % 60;

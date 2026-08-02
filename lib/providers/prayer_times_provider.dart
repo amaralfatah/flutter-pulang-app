@@ -128,11 +128,14 @@ class PrayerTimesNotifier extends Notifier<PrayerTimesState> {
       }
     }
 
-    // All prayers passed for today
+    // All prayers passed for today — count down to tomorrow's Subuh instead of
+    // dropping the countdown, which used to leave the card showing a stale
+    // duration next to a "besok" label.
+    final tomorrowSubuh = _parseTime(pt.subuh)?.add(const Duration(days: 1));
     state = state.copyWith(
       nextPrayerName: 'Subuh (besok)',
       nextPrayerTime: pt.subuh,
-      remainingTime: null,
+      remainingTime: tomorrowSubuh?.difference(now),
     );
   }
 
