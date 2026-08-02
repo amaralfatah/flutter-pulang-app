@@ -32,13 +32,16 @@ class _QadhaScreenState extends ConsumerState<QadhaScreen> {
   Widget build(BuildContext context) {
     final state = ref.watch(ledgerProvider);
     final byDate = _grouping == QadhaGrouping.byDate;
+    // Fixed 56px overflows once system font scale grows the segmented
+    // button's label text (Dynamic Type / large accessibility text sizes).
+    final segmentedHeight = 56 * MediaQuery.textScalerOf(context).scale(1.0);
 
     return Scaffold(
       appBar: AppBar(
         title: const Text('Qadha'),
         bottom: state.hasData
             ? PreferredSize(
-                preferredSize: const Size.fromHeight(56),
+                preferredSize: Size.fromHeight(segmentedHeight),
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
                   child: SegmentedButton<QadhaGrouping>(
@@ -267,6 +270,10 @@ class _QadhaDayCardState extends ConsumerState<_QadhaDayCard> {
   /// Id baris yang sedang dipilih — masih di memori, belum tersimpan.
   final Set<int> _selected = {};
 
+  /// Mencegah double-tap pada tombol simpan memicu dua kali penyimpanan
+  /// sementara permintaan pertama masih berjalan.
+  bool _isSaving = false;
+
   QadhaDay get _day => widget.day;
 
   @override
@@ -379,8 +386,14 @@ class _QadhaDayCardState extends ConsumerState<_QadhaDayCard> {
                   Expanded(
                     flex: 2,
                     child: FilledButton(
-                      onPressed: _save,
-                      child: Text('Tandai ${_selected.length} lunas'),
+                      onPressed: _isSaving ? null : _save,
+                      child: _isSaving
+                          ? const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Text('Tandai ${_selected.length} lunas'),
                     ),
                   ),
                 ],
@@ -404,6 +417,7 @@ class _QadhaDayCardState extends ConsumerState<_QadhaDayCard> {
   }
 
   Future<void> _save() async {
+    setState(() => _isSaving = true);
     final messenger = ScaffoldMessenger.of(context);
     final notifier = ref.read(ledgerProvider.notifier);
     final chosen = _day.prayers.where((p) => _selected.contains(p.id!));
@@ -413,11 +427,15 @@ class _QadhaDayCardState extends ConsumerState<_QadhaDayCard> {
       final paid = await notifier.payQadhaFor(_day.date, prayer.prayerName);
       if (paid != null) ids.add(paid.id!);
     }
+
+    if (mounted) setState(() => _isSaving = false);
     if (ids.isEmpty) return;
 
     messenger.showSnackBar(
       SnackBar(
         content: Text('${ids.length} qadha ${_shortDate(_day.date)} lunas.'),
+        // Lihat catatan di home_screen: tanpa ini snackbar tidak hilang sendiri.
+        persist: false,
         action: SnackBarAction(
           label: 'Urungkan',
           onPressed: () => notifier.undoPayQadha(ids),
@@ -552,6 +570,8 @@ class _QadhaRow extends ConsumerWidget {
               ? '${prayerName.displayName} ${_shortDate(paid.first.date)} tercatat lunas.'
               : '${paid.length} qadha ${prayerName.displayName} tercatat lunas.',
         ),
+        // Lihat catatan di home_screen: tanpa ini snackbar tidak hilang sendiri.
+        persist: false,
         action: SnackBarAction(
           label: 'Urungkan',
           onPressed: () =>
@@ -943,6 +963,8 @@ class _ConfirmDayCard extends ConsumerWidget {
               ? '$formatted dicatat terlewat.'
               : '$formatted dicatat sudah dikerjakan.',
         ),
+        // Lihat catatan di home_screen: tanpa ini snackbar tidak hilang sendiri.
+        persist: false,
         action: SnackBarAction(
           label: 'Urungkan',
           onPressed: () => notifier.undoConfirmDay(ids),

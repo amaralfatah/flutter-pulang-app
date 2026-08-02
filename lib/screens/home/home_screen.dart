@@ -9,6 +9,7 @@ import '../../providers/providers.dart';
 import '../../widgets/home/prayer_timer_card.dart';
 import '../../widgets/shared/prayer_card.dart';
 import '../../widgets/shared/check_in_bottom_sheet.dart';
+import '../../widgets/shared/app_snackbar.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -48,6 +49,9 @@ class HomeScreen extends ConsumerWidget {
           await todayPrayersNotifier.refresh();
         },
         child: ListView(
+          // Error/empty states are short enough to not fill the viewport;
+          // without this, RefreshIndicator can't be triggered from them.
+          physics: const AlwaysScrollableScrollPhysics(),
           padding: const EdgeInsets.only(top: 8, bottom: 24),
           children: [
             // Header: Location & Date (SEPARATED)
@@ -56,7 +60,7 @@ class HomeScreen extends ConsumerWidget {
             const SizedBox(height: 16),
 
             // Timer Card (ONLY next prayer info)
-            const PrayerTimerCard(),
+            PrayerTimerCard(onTap: () => _handleTimerTap(context, ref)),
 
             const SizedBox(height: 24),
 
@@ -358,6 +362,43 @@ class HomeScreen extends ConsumerWidget {
     }).toList();
   }
 
+  /// Kartu timer menampilkan solat berikutnya — jadikan ia jalan pintas untuk
+  /// mencatatnya, tanpa harus mencari barisnya di daftar di bawah.
+  void _handleTimerTap(BuildContext context, WidgetRef ref) {
+    final state = ref.read(prayerTimesProvider);
+    final prayerTime = state.prayerTime;
+    final nextName = state.nextPrayerName;
+    // "Subuh (besok)" berarti semua solat hari ini sudah lewat waktunya —
+    // belum ada yang bisa dicatat untuk esok.
+    if (prayerTime == null || nextName == null || nextName.contains('besok')) {
+      return;
+    }
+
+    final match = PrayerName.values
+        .where((p) => p.displayName == nextName)
+        .firstOrNull;
+    if (match == null) return;
+
+    final time = _timeForPrayer(prayerTime, match);
+    final existingRecord = ref.read(todayPrayersProvider).getPrayerByName(match);
+    _handlePrayerTap(context, ref, match, time, existingRecord);
+  }
+
+  String _timeForPrayer(PrayerTime prayerTime, PrayerName name) {
+    switch (name) {
+      case PrayerName.subuh:
+        return prayerTime.subuh;
+      case PrayerName.dzuhur:
+        return prayerTime.dzuhur;
+      case PrayerName.ashar:
+        return prayerTime.ashar;
+      case PrayerName.maghrib:
+        return prayerTime.maghrib;
+      case PrayerName.isya:
+        return prayerTime.isya;
+    }
+  }
+
   Future<void> _handlePrayerTap(
     BuildContext context,
     WidgetRef ref,
@@ -369,11 +410,111 @@ class HomeScreen extends ConsumerWidget {
       context: context,
       prayerName: name,
       currentStatus: existingRecord?.status,
-      onStatusSelected: (status) {
-        ref
-            .read(todayPrayersProvider.notifier)
-            .checkIn(prayerName: name, status: status);
-      },
+      isOutstandingQadha: existingRecord?.isOutstandingQadha ?? false,
+      onQadhaPaid: existingRecord == null
+          ? null
+          : () => _handleQadhaPaid(context, ref, name, existingRecord),
+      onDelete: existingRecord == null
+          ? null
+          : () => _handleDelete(context, ref, name, existingRecord),
+      onStatusSelected: (status) =>
+          _handleStatusSelected(context, ref, name, status, existingRecord),
     );
+  }
+
+  /// Menyimpan status baru, lalu menawarkan "Urungkan" — mengembalikan catatan
+  /// sebelumnya (jika ada) atau menghapus catatan yang baru dibuat.
+  Future<void> _handleStatusSelected(
+    BuildContext context,
+    WidgetRef ref,
+    PrayerName name,
+    PrayerStatus status,
+    Prayer? previousRecord,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final notifier = ref.read(todayPrayersProvider.notifier);
+
+    await notifier.checkIn(prayerName: name, status: status);
+    if (!context.mounted) return;
+
+    // checkIn() awaits its own reload, so the fresh id is already available.
+    final newRecord = ref.read(todayPrayersProvider).getPrayerByName(name);
+
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('${name.displayName} dicatat: ${_statusLabel(status)}.'),
+        // Sejak Flutter 3.44 `persist` default-nya `action != null`, jadi
+        // snackbar ber-aksi menempel di layar sampai digeser manual. Kita mau
+        // perilaku lama: hilang sendiri setelah 4 detik.
+        persist: false,
+        action: SnackBarAction(
+          label: 'Urungkan',
+          onPressed: () {
+            if (previousRecord != null) {
+              notifier.updatePrayer(previousRecord);
+            } else if (newRecord?.id != null) {
+              notifier.deletePrayer(newRecord!.id!);
+            }
+          },
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleDelete(
+    BuildContext context,
+    WidgetRef ref,
+    PrayerName name,
+    Prayer record,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final notifier = ref.read(todayPrayersProvider.notifier);
+
+    await notifier.deletePrayer(record.id!);
+    if (!context.mounted) return;
+
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('Catatan ${name.displayName} dihapus.'),
+        persist: false,
+        action: SnackBarAction(
+          label: 'Urungkan',
+          onPressed: () => notifier.restorePrayer(record),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _handleQadhaPaid(
+    BuildContext context,
+    WidgetRef ref,
+    PrayerName name,
+    Prayer record,
+  ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    final paid = await ref
+        .read(ledgerProvider.notifier)
+        .payQadhaFor(record.date, name);
+    if (!context.mounted || paid == null) return;
+
+    messenger.showSnackBar(
+      AppSnackBar.success(
+        colorScheme,
+        'Qadha ${name.displayName} tercatat lunas.',
+      ),
+    );
+  }
+
+  String _statusLabel(PrayerStatus status) {
+    switch (status) {
+      case PrayerStatus.onTime:
+        return 'Tepat Waktu';
+      case PrayerStatus.late:
+        return 'Qadha / Terlambat';
+      case PrayerStatus.missed:
+        return 'Terlewat';
+    }
   }
 }

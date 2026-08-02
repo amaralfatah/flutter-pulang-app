@@ -26,6 +26,11 @@ class PrayerTimesState {
 
   PrayerTimesState copyWith({
     PrayerTime? prayerTime,
+    // Without this flag, a failed reload could never clear a previously
+    // loaded schedule — `prayerTime ?? this.prayerTime` always keeps the old
+    // one once it's set, so a city change followed by an error would silently
+    // keep showing the old city's (wrong) times.
+    bool clearPrayerTime = false,
     bool? isLoading,
     String? error,
     String? nextPrayerName,
@@ -33,7 +38,7 @@ class PrayerTimesState {
     Duration? remainingTime,
   }) {
     return PrayerTimesState(
-      prayerTime: prayerTime ?? this.prayerTime,
+      prayerTime: clearPrayerTime ? null : (prayerTime ?? this.prayerTime),
       isLoading: isLoading ?? this.isLoading,
       error: error,
       nextPrayerName: nextPrayerName ?? this.nextPrayerName,
@@ -89,9 +94,23 @@ class PrayerTimesNotifier extends Notifier<PrayerTimesState> {
         } else {
           await _notificationService.cancelAllNotifications();
         }
+
+        // Best-effort: cache the next few days so the schedule still reads
+        // if the app is opened later without a connection.
+        final cityId = await _preferencesService.getCityId();
+        if (cityId != null) {
+          unawaited(_prayerApiService.prefetchPrayerTimes(cityId: cityId));
+        }
       }
     } catch (e) {
-      state = state.copyWith(error: e.toString(), isLoading: false);
+      // A thrown error (e.g. offline) must not leave a stale schedule on
+      // screen — clear it so the UI shows the actual error state instead of
+      // silently keeping whatever was loaded before.
+      state = state.copyWith(
+        error: e.toString(),
+        isLoading: false,
+        clearPrayerTime: true,
+      );
     }
   }
 
@@ -186,23 +205,3 @@ final prayerTimesProvider =
     NotifierProvider<PrayerTimesNotifier, PrayerTimesState>(
       PrayerTimesNotifier.new,
     );
-
-/// Provider for next prayer info as formatted string
-final nextPrayerInfoProvider = Provider<String>((ref) {
-  final state = ref.watch(prayerTimesProvider);
-
-  if (state.nextPrayerName == null) return 'Loading...';
-
-  if (state.remainingTime == null) {
-    return '${state.nextPrayerName} - ${state.nextPrayerTime}';
-  }
-
-  final hours = state.remainingTime!.inHours;
-  final minutes = state.remainingTime!.inMinutes % 60;
-
-  if (hours > 0) {
-    return '${state.nextPrayerName} - ${state.nextPrayerTime} ($hours jam $minutes menit lagi)';
-  } else {
-    return '${state.nextPrayerName} - ${state.nextPrayerTime} ($minutes menit lagi)';
-  }
-});

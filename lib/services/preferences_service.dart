@@ -12,6 +12,7 @@ class PreferencesService {
   static const String _keyAutoBackupEnabled = 'auto_backup_enabled';
   static const String _keyGoogleAccountEmail = 'google_account_email';
   static const String _keyThemeMode = 'theme_mode';
+  static const String _keyOnboardingCompleted = 'onboarding_completed';
 
   /// Initialize SharedPreferences
   Future<void> init() async {
@@ -125,6 +126,20 @@ class PreferencesService {
   Future<bool> setThemeMode(String mode) async {
     final p = await prefs;
     return p.setString(_keyThemeMode, mode);
+  }
+
+  // ============ ONBOARDING ============
+
+  /// Whether the first-run onboarding flow has been completed.
+  Future<bool> isOnboardingCompleted() async {
+    final p = await prefs;
+    return p.getBool(_keyOnboardingCompleted) ?? false;
+  }
+
+  /// Mark the first-run onboarding flow as completed.
+  Future<bool> setOnboardingCompleted() async {
+    final p = await prefs;
+    return p.setBool(_keyOnboardingCompleted, true);
   }
 
   // ============ UTILITY METHODS ============

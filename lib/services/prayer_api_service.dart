@@ -60,21 +60,6 @@ class PrayerApiService {
     }
   }
 
-  /// Get all available cities (cached or from API)
-  Future<List<City>> getAllCities() async {
-    try {
-      final response = await _dio.get('$_baseUrl/kota/semua');
-
-      if (response.statusCode == 200 && response.data['status'] == true) {
-        final data = response.data['data'] as List;
-        return data.map((json) => City.fromJson(json)).toList();
-      }
-      return [];
-    } catch (e) {
-      throw PrayerApiException('Gagal mengambil daftar kota: $e');
-    }
-  }
-
   // ============ PRAYER TIMES ============
 
   /// Get prayer times for a specific date
@@ -109,10 +94,11 @@ class PrayerApiService {
 
       return prayerTime;
     } on DioException catch (e) {
-      // If offline, return null (caller should handle this)
+      // Thrown (not swallowed) so callers can tell "offline, city already set"
+      // apart from "no city selected" — the two need different UI treatment.
       if (e.type == DioExceptionType.connectionError ||
           e.type == DioExceptionType.connectionTimeout) {
-        return null;
+        throw PrayerApiException('Tidak ada koneksi internet');
       }
       throw PrayerApiException('Gagal mengambil jadwal solat: ${e.message}');
     }
@@ -147,7 +133,9 @@ class PrayerApiService {
     return getPrayerTimes(cityId: cityId, date: DateTime.now());
   }
 
-  /// Prefetch prayer times for the next few days
+  /// Prefetch prayer times for the next few days so the schedule is still
+  /// readable if the user opens the app later without a connection.
+  /// Best-effort: one failed day (e.g. offline) must not abort the rest.
   Future<void> prefetchPrayerTimes({
     required String cityId,
     int days = 3,
@@ -155,7 +143,11 @@ class PrayerApiService {
     final now = DateTime.now();
     for (int i = 0; i <= days; i++) {
       final date = now.add(Duration(days: i));
-      await getPrayerTimes(cityId: cityId, date: date);
+      try {
+        await getPrayerTimes(cityId: cityId, date: date);
+      } catch (_) {
+        // Ignore and keep trying the remaining days.
+      }
     }
   }
 
@@ -166,50 +158,6 @@ class PrayerApiService {
     return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
   }
 
-  /// Get the next prayer name and time based on current time
-  Future<({String name, String time, Duration remaining})?>
-  getNextPrayer() async {
-    final prayerTime = await getTodayPrayerTimes();
-    if (prayerTime == null) return null;
-
-    final now = DateTime.now();
-    final prayers = [
-      ('Subuh', prayerTime.subuh),
-      ('Dzuhur', prayerTime.dzuhur),
-      ('Ashar', prayerTime.ashar),
-      ('Maghrib', prayerTime.maghrib),
-      ('Isya', prayerTime.isya),
-    ];
-
-    for (final (name, timeStr) in prayers) {
-      final time = _parseTime(timeStr);
-      if (time != null && time.isAfter(now)) {
-        return (name: name, time: timeStr, remaining: time.difference(now));
-      }
-    }
-
-    // All prayers passed, next is tomorrow's Subuh
-    return null;
-  }
-
-  /// Parse time string (HH:mm) to DateTime
-  DateTime? _parseTime(String timeStr) {
-    try {
-      final parts = timeStr.split(':');
-      if (parts.length != 2) return null;
-
-      final now = DateTime.now();
-      return DateTime(
-        now.year,
-        now.month,
-        now.day,
-        int.parse(parts[0]),
-        int.parse(parts[1]),
-      );
-    } catch (_) {
-      return null;
-    }
-  }
 }
 
 /// Custom exception for Prayer API errors

@@ -580,7 +580,9 @@ class DatabaseService {
       'prayers',
       where: 'status = ? AND qadha_paid_at IS NOT NULL',
       whereArgs: [PrayerStatus.missed.value],
-      orderBy: 'qadha_paid_at DESC',
+      // id DESC memutus seri: dua pelunasan dalam milidetik yang sama
+      // dapat timestamp identik, dan urutan SQLite untuk seri tidak terdefinisi.
+      orderBy: 'qadha_paid_at DESC, id DESC',
       limit: limit,
     );
     return maps.map(Prayer.fromMap).toList();

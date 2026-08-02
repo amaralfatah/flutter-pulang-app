@@ -79,6 +79,23 @@ class NotificationService {
     _isInitialized = true;
   }
 
+  /// Whether the OS actually permits notifications right now. Used to detect
+  /// when the user has "Aktifkan Notifikasi" on in-app but denied the OS
+  /// permission — a state where the toggle lies about whether alarms will
+  /// ever be seen.
+  Future<bool> areNotificationsPermitted() async {
+    if (Platform.isAndroid) {
+      final androidImplementation = _notificationsPlugin
+          .resolvePlatformSpecificImplementation<
+            AndroidFlutterLocalNotificationsPlugin
+          >();
+      return await androidImplementation?.areNotificationsEnabled() ?? true;
+    }
+    // Other platforms: assume permitted rather than block on an unverified
+    // check — requestPermissions() still runs its own OS-level prompt.
+    return true;
+  }
+
   /// Request permissions
   Future<bool> requestPermissions() async {
     bool? granted = false;

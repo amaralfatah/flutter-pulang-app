@@ -178,6 +178,13 @@ class CalendarNotifier extends Notifier<CalendarState> {
     }
   }
 
+  /// Catatan yang diubah di kalender bisa jatuh pada hari ini juga, jadi buku
+  /// besar dan kartu Beranda perlu ikut dimuat ulang — bukan hanya kalender.
+  void _invalidateDependents() {
+    ref.invalidate(ledgerProvider);
+    ref.invalidate(todayPrayersProvider);
+  }
+
   /// Check-in prayer for a specific date (retroactive)
   Future<void> checkInForDate({
     required DateTime date,
@@ -197,8 +204,7 @@ class CalendarNotifier extends Notifier<CalendarState> {
       await _loadMonthPrayerStatus(date.year, date.month);
       await selectDay(date);
 
-      // Invalidate related providers
-      ref.invalidate(ledgerProvider);
+      _invalidateDependents();
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }
@@ -217,7 +223,7 @@ class CalendarNotifier extends Notifier<CalendarState> {
 
       await _loadMonthPrayerStatus(date.year, date.month);
       await selectDay(date);
-      ref.invalidate(ledgerProvider);
+      _invalidateDependents();
       return true;
     } catch (e) {
       state = state.copyWith(error: e.toString());
@@ -234,8 +240,7 @@ class CalendarNotifier extends Notifier<CalendarState> {
       await _loadMonthPrayerStatus(date.year, date.month);
       await selectDay(date);
 
-      // Invalidate related providers
-      ref.invalidate(ledgerProvider);
+      _invalidateDependents();
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }

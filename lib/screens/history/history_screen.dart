@@ -26,6 +26,9 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
   @override
   Widget build(BuildContext context) {
     final isCalendar = _tab == HistoryTab.calendar;
+    // Fixed 56px overflows once system font scale grows the segmented
+    // button's label text (Dynamic Type / large accessibility text sizes).
+    final segmentedHeight = 56 * MediaQuery.textScalerOf(context).scale(1.0);
 
     return Scaffold(
       appBar: AppBar(
@@ -44,7 +47,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
             ),
         ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(56),
+          preferredSize: Size.fromHeight(segmentedHeight),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: SegmentedButton<HistoryTab>(

@@ -177,7 +177,9 @@ class LedgerNotifier extends Notifier<LedgerState> {
 
   Future<void> _refreshDependents() async {
     await _load();
-    ref.invalidate(calendarProvider);
+    // Kalender disegarkan lewat notifier, bukan di-invalidate, supaya bulan
+    // yang sedang ditelusuri user tidak melompat balik ke hari ini.
+    await ref.read(calendarProvider.notifier).refresh();
     ref.invalidate(todayPrayersProvider);
   }
 }

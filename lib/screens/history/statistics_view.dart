@@ -60,6 +60,16 @@ class StatisticsView extends ConsumerWidget {
             ],
           ),
         ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+          child: Text(
+            'Streak: hari berturut-turut dengan kelima solat terpenuhi — '
+            'tepat waktu, terlambat, atau sudah diqadha.',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ),
         const SizedBox(height: 24),
         if (ledger.weakestPrayer != null)
           _InsightCard(ledger: ledger),

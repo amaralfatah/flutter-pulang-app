@@ -23,6 +23,12 @@ class CheckInBottomSheet extends StatelessWidget {
   /// terlewat lalu diqadha, dan membuatnya tak bisa dibatalkan.
   final VoidCallback? onQadhaPaid;
 
+  /// Menghapus catatan ini sepenuhnya, mengembalikannya ke "Belum dicatat".
+  /// Hanya relevan saat [currentStatus] sudah terisi — tanpa jalur ini,
+  /// salah tap tidak bisa dikembalikan ke kosong, hanya bisa ditimpa status
+  /// lain.
+  final VoidCallback? onDelete;
+
   const CheckInBottomSheet({
     super.key,
     required this.prayerName,
@@ -31,6 +37,7 @@ class CheckInBottomSheet extends StatelessWidget {
     this.subtitle,
     this.isOutstandingQadha = false,
     this.onQadhaPaid,
+    this.onDelete,
   });
 
   /// Show the check-in bottom sheet
@@ -42,6 +49,7 @@ class CheckInBottomSheet extends StatelessWidget {
     String? subtitle,
     bool isOutstandingQadha = false,
     VoidCallback? onQadhaPaid,
+    VoidCallback? onDelete,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -62,6 +70,12 @@ class CheckInBottomSheet extends StatelessWidget {
             : () {
                 Navigator.pop(sheetContext);
                 onQadhaPaid();
+              },
+        onDelete: onDelete == null
+            ? null
+            : () {
+                Navigator.pop(sheetContext);
+                onDelete();
               },
         onStatusSelected: (status) {
           Navigator.pop(sheetContext);
@@ -171,6 +185,21 @@ class CheckInBottomSheet extends StatelessWidget {
             ),
 
             const SizedBox(height: 24),
+
+            // Delete: only offered when there's actually a record to remove.
+            if (isEdit && onDelete != null) ...[
+              TextButton.icon(
+                onPressed: onDelete,
+                icon: Icon(Icons.delete_outline_rounded, color: colorScheme.error),
+                label: Text(
+                  'Hapus catatan',
+                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                    color: colorScheme.error,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+            ],
 
             // Cancel Button
             TextButton(

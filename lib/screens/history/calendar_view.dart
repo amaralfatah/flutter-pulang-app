@@ -27,6 +27,8 @@ class CalendarView extends ConsumerWidget {
       children: [
         const SizedBox(height: 8),
         _buildCalendar(context, ref, state),
+        const SizedBox(height: 12),
+        _buildLegend(context),
         const SizedBox(height: 16),
         if (state.selectedDay != null)
           _buildSelectedDayDetail(context, ref, state),
@@ -170,6 +172,49 @@ class CalendarView extends ConsumerWidget {
             },
           ),
         ),
+      ),
+    );
+  }
+
+  /// Warna pada cincin progres tidak boleh jadi satu-satunya penanda status —
+  /// legenda ini memberi label teks agar tetap terbaca oleh yang buta warna.
+  Widget _buildLegend(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final items = [
+      (colorScheme.statusOnTime, 'Tepat waktu'),
+      (colorScheme.statusLate, 'Terlambat'),
+      (colorScheme.statusMissed, 'Terlewat'),
+    ];
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Wrap(
+        spacing: 16,
+        runSpacing: 4,
+        children: items
+            .map(
+              (item) => Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: item.$1,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    item.$2,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            )
+            .toList(),
       ),
     );
   }
@@ -407,19 +452,36 @@ class CalendarView extends ConsumerWidget {
       currentStatus: existingPrayer?.status,
       subtitle: formattedDate,
       isOutstandingQadha: existingPrayer?.isOutstandingQadha ?? false,
-      onQadhaPaid: () async {
-        final paid = await ref
-            .read(calendarProvider.notifier)
-            .payQadhaForDate(date: selectedDay, prayerName: prayerName);
-        if (!paid) return;
+      onQadhaPaid: existingPrayer == null
+          ? null
+          : () async {
+              final paid = await ref
+                  .read(calendarProvider.notifier)
+                  .payQadhaForDate(date: selectedDay, prayerName: prayerName);
+              if (!paid) return;
 
-        messenger.showSnackBar(
-          AppSnackBar.success(
-            colorScheme,
-            'Qadha ${prayerName.displayName} $formattedDate tercatat lunas.',
-          ),
-        );
-      },
+              messenger.showSnackBar(
+                AppSnackBar.success(
+                  colorScheme,
+                  'Qadha ${prayerName.displayName} $formattedDate tercatat lunas.',
+                ),
+              );
+            },
+      onDelete: existingPrayer?.id == null
+          ? null
+          : () async {
+              await ref
+                  .read(calendarProvider.notifier)
+                  .deletePrayerForDate(existingPrayer!.id!, selectedDay);
+              if (!context.mounted) return;
+
+              messenger.showSnackBar(
+                AppSnackBar.info(
+                  colorScheme,
+                  'Catatan ${prayerName.displayName} $formattedDate dihapus.',
+                ),
+              );
+            },
       onStatusSelected: (status) {
         ref
             .read(calendarProvider.notifier)

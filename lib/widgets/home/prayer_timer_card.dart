@@ -7,7 +7,11 @@ import '../patterns/pattern_painters.dart';
 /// Card widget yang menampilkan info solat berikutnya
 /// Dengan background pattern Islamic geometric
 class PrayerTimerCard extends ConsumerWidget {
-  const PrayerTimerCard({super.key});
+  const PrayerTimerCard({super.key, this.onTap});
+
+  /// Membuka check-in untuk solat berikutnya. Null saat belum ada solat
+  /// berikutnya yang bisa dicatat (mis. masih menunggu jadwal dimuat).
+  final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -24,9 +28,12 @@ class PrayerTimerCard extends ConsumerWidget {
             color: colorScheme.onPrimary,
             opacity: 0.1,
           ),
-          child: Padding(
-            padding: const EdgeInsets.all(24),
-            child: _buildContent(context, prayerTimesState),
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.all(24),
+              child: _buildContent(context, prayerTimesState),
+            ),
           ),
         ),
       ),

@@ -1,8 +1,21 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 import '../services/services.dart';
 import 'prayer_provider.dart';
 import 'prayer_times_provider.dart';
+
+/// App version/build info, read once from the platform.
+final packageInfoProvider = FutureProvider<PackageInfo>((ref) {
+  return PackageInfo.fromPlatform();
+});
+
+/// Whether the OS currently permits notifications — separate from the
+/// in-app "notificationEnabled" preference, which only reflects what the
+/// user asked for, not whether the OS actually grants it.
+final notificationsPermittedProvider = FutureProvider<bool>((ref) {
+  return ref.watch(notificationServiceProvider).areNotificationsPermitted();
+});
 
 /// State for app settings
 class SettingsState {

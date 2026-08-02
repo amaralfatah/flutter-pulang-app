@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -39,6 +41,15 @@ class SettingsScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  /// [raw] is stored as ISO 8601; older installs may still have the legacy
+  /// "yyyy-MM-dd HH:mm:ss" text, which also parses fine via [DateTime.tryParse].
+  String _formatBackupDate(String? raw) {
+    if (raw == null) return 'Belum pernah backup';
+    final parsed = DateTime.tryParse(raw);
+    if (parsed == null) return raw;
+    return DateFormat('d MMM yyyy, HH:mm', 'id_ID').format(parsed);
   }
 
   /// M3 list subheader: `titleSmall` in the primary colour (no ad-hoc bold).
@@ -120,14 +131,73 @@ class SettingsScreen extends ConsumerWidget {
     SettingsState settings,
     SettingsNotifier notifier,
   ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    // The in-app toggle only reflects intent; the OS can still be silently
+    // blocking every alarm behind it, which the toggle alone can't reveal.
+    final osPermitted = ref.watch(notificationsPermittedProvider);
+    final showBlockedBanner =
+        settings.notificationEnabled && (osPermitted.value == false);
+
     return _buildSection(context, [
       SwitchListTile(
         secondary: _leadingIcon(context, Icons.notifications_active_outlined),
         title: const Text('Aktifkan Notifikasi'),
         subtitle: const Text('Notifikasi saat masuk waktu solat'),
         value: settings.notificationEnabled,
-        onChanged: (value) => notifier.setNotificationEnabled(value),
+        onChanged: (value) async {
+          await notifier.setNotificationEnabled(value);
+          ref.invalidate(notificationsPermittedProvider);
+        },
       ),
+      if (showBlockedBanner)
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: colorScheme.errorContainer,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.notifications_off_rounded,
+                      size: 18,
+                      color: colorScheme.onErrorContainer,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Izin notifikasi ditolak di sistem — pengingat tidak '
+                        'akan muncul walau opsi ini aktif.',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onErrorContainer,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Align(
+                  alignment: Alignment.centerRight,
+                  child: TextButton(
+                    onPressed: () async {
+                      await ref
+                          .read(notificationServiceProvider)
+                          .requestPermissions();
+                      ref.invalidate(notificationsPermittedProvider);
+                    },
+                    child: const Text('Minta Izin Lagi'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
     ]);
   }
 
@@ -274,9 +344,7 @@ class SettingsScreen extends ConsumerWidget {
           leading: _leadingIcon(context, Icons.cloud_upload_outlined),
           title: const Text('Backup Data'),
           subtitle: Text(
-            settings.lastBackupDate != null
-                ? 'Terakhir: ${settings.lastBackupDate}'
-                : 'Belum pernah backup',
+            'Terakhir: ${_formatBackupDate(settings.lastBackupDate)}',
           ),
           onTap: () => _confirmManualBackup(context, ref),
         ),
@@ -734,6 +802,7 @@ class SettingsScreen extends ConsumerWidget {
     SettingsState settings,
   ) {
     final colorScheme = Theme.of(context).colorScheme;
+    final packageInfo = ref.watch(packageInfoProvider);
     return _buildSection(context, [
       ListTile(
         leading: _leadingIcon(
@@ -743,7 +812,13 @@ class SettingsScreen extends ConsumerWidget {
           foreground: colorScheme.onSurfaceVariant,
         ),
         title: const Text('Versi Aplikasi'),
-        subtitle: const Text('1.0.0 (Beta)'),
+        subtitle: Text(
+          packageInfo.when(
+            data: (info) => '${info.version} (${info.buildNumber})',
+            loading: () => '...',
+            error: (_, _) => '-',
+          ),
+        ),
       ),
       // Destructive action: error-tinted icon + title to set it apart from
       // the neutral entries above (M3 destructive emphasis).
@@ -870,19 +945,39 @@ class _CitySearchDialog extends ConsumerStatefulWidget {
 }
 
 class _CitySearchDialogState extends ConsumerState<_CitySearchDialog> {
+  static const _minQueryLength = 3;
+
   final _searchController = TextEditingController();
   List<City> _cities = [];
   bool _isLoading = false;
   String? _error;
+  Timer? _debounce;
 
   @override
   void dispose() {
+    _debounce?.cancel();
     _searchController.dispose();
     super.dispose();
   }
 
+  /// Ketikan dijeda 400ms sebelum menembak API, supaya tiap huruf yang
+  /// diketik tidak memicu request sendiri-sendiri.
+  void _onQueryChanged(String query) {
+    _debounce?.cancel();
+    if (query.trim().length < _minQueryLength) {
+      setState(() {
+        _cities = [];
+        _error = null;
+      });
+      return;
+    }
+    _debounce = Timer(const Duration(milliseconds: 400), () {
+      _searchCities(query);
+    });
+  }
+
   Future<void> _searchCities(String query) async {
-    if (query.trim().isEmpty) return;
+    if (query.trim().length < _minQueryLength) return;
 
     setState(() {
       _isLoading = true;
@@ -892,11 +987,13 @@ class _CitySearchDialogState extends ConsumerState<_CitySearchDialog> {
     try {
       final apiService = ref.read(prayerApiServiceProvider);
       final cities = await apiService.searchCities(query);
+      if (!mounted) return;
       setState(() {
         _cities = cities;
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
       setState(() {
         _error = e.toString();
         _isLoading = false;
@@ -904,9 +1001,33 @@ class _CitySearchDialogState extends ConsumerState<_CitySearchDialog> {
     }
   }
 
+  Future<void> _selectCity(City city) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
+
+    await ref
+        .read(settingsProvider.notifier)
+        .setCity(id: city.id, name: city.name);
+    await ref.read(prayerTimesProvider.notifier).refresh();
+    // Best-effort: warm the offline cache for the newly chosen city too.
+    unawaited(
+      ref
+          .read(prayerApiServiceProvider)
+          .prefetchPrayerTimes(cityId: city.id),
+    );
+
+    if (!mounted) return;
+    Navigator.pop(context);
+    messenger.showSnackBar(
+      AppSnackBar.success(colorScheme, 'Kota diubah ke ${city.name}'),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final query = _searchController.text.trim();
+
     return Dialog(
       child: Container(
         padding: const EdgeInsets.all(24),
@@ -921,7 +1042,7 @@ class _CitySearchDialogState extends ConsumerState<_CitySearchDialog> {
               keyboardType: TextInputType.text,
               textInputAction: TextInputAction.search,
               decoration: InputDecoration(
-                hintText: 'Masukkan nama kota (min. 3 huruf)',
+                hintText: 'Masukkan nama kota (min. $_minQueryLength huruf)',
                 filled: true,
                 fillColor: colorScheme.surfaceContainerHighest,
                 border: OutlineInputBorder(
@@ -942,9 +1063,12 @@ class _CitySearchDialogState extends ConsumerState<_CitySearchDialog> {
                 suffixIcon: IconButton(
                   icon: Icon(Icons.search_rounded, color: colorScheme.primary),
                   tooltip: 'Cari',
-                  onPressed: () => _searchCities(_searchController.text),
+                  onPressed: _isLoading
+                      ? null
+                      : () => _searchCities(_searchController.text),
                 ),
               ),
+              onChanged: _onQueryChanged,
               onSubmitted: _searchCities,
               autofocus: true,
             ),
@@ -953,7 +1077,12 @@ class _CitySearchDialogState extends ConsumerState<_CitySearchDialog> {
               const CircularProgressIndicator()
             else if (_error != null)
               Text(_error!, style: TextStyle(color: colorScheme.error))
-            else if (_cities.isEmpty && _searchController.text.isNotEmpty)
+            else if (query.length < _minQueryLength && query.isNotEmpty)
+              Text(
+                'Ketik minimal $_minQueryLength huruf.',
+                style: TextStyle(color: colorScheme.onSurfaceVariant),
+              )
+            else if (_cities.isEmpty && query.isNotEmpty)
               Text(
                 'Kota tidak ditemukan',
                 style: TextStyle(color: colorScheme.onSurfaceVariant),
@@ -967,24 +1096,7 @@ class _CitySearchDialogState extends ConsumerState<_CitySearchDialog> {
                     final city = _cities[index];
                     return ListTile(
                       title: Text(city.name),
-                      onTap: () async {
-                        final messenger = ScaffoldMessenger.of(context);
-                        await ref
-                            .read(settingsProvider.notifier)
-                            .setCity(id: city.id, name: city.name);
-
-                        await ref.read(prayerTimesProvider.notifier).refresh();
-
-                        if (context.mounted) {
-                          Navigator.pop(context);
-                          messenger.showSnackBar(
-                            AppSnackBar.success(
-                              colorScheme,
-                              'Kota diubah ke ${city.name}',
-                            ),
-                          );
-                        }
-                      },
+                      onTap: () => _selectCity(city),
                     );
                   },
                 ),

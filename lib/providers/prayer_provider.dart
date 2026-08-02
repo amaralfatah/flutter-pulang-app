@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/models.dart';
 import '../services/services.dart';
+import 'calendar_provider.dart';
 import 'ledger_provider.dart';
 
 /// Database service provider (singleton)
@@ -93,11 +94,6 @@ class TodayPrayersState {
     }
   }
 
-  /// Check if a specific prayer is completed
-  bool isPrayerCompleted(PrayerName name) {
-    final prayer = getPrayerByName(name);
-    return prayer != null && prayer.status != PrayerStatus.missed;
-  }
 }
 
 /// Notifier for today's prayers (Riverpod 3 syntax)
@@ -124,6 +120,15 @@ class TodayPrayersNotifier extends Notifier<TodayPrayersState> {
     } catch (e) {
       state = state.copyWith(error: e.toString(), isLoading: false);
     }
+  }
+
+  /// Setiap perubahan catatan hari ini juga mengubah apa yang dibaca layar
+  /// Riwayat dan Qadha. Buku besar cukup di-invalidate (dia selalu memuat
+  /// ulang dari nol), sedangkan kalender disegarkan lewat notifier-nya supaya
+  /// bulan yang sedang dibuka user tidak ikut kembali ke hari ini.
+  void _refreshDependents() {
+    ref.invalidate(ledgerProvider);
+    ref.read(calendarProvider.notifier).refresh();
   }
 
   /// Refresh prayers
@@ -153,8 +158,7 @@ class TodayPrayersNotifier extends Notifier<TodayPrayersState> {
     try {
       await _databaseService.upsertPrayer(prayer);
       await _loadTodayPrayers();
-      // Invalidate dependent providers to refresh their data
-      ref.invalidate(ledgerProvider);
+      _refreshDependents();
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }
@@ -165,8 +169,7 @@ class TodayPrayersNotifier extends Notifier<TodayPrayersState> {
     try {
       await _databaseService.updatePrayer(prayer);
       await _loadTodayPrayers();
-      // Invalidate dependent providers to refresh their data
-      ref.invalidate(ledgerProvider);
+      _refreshDependents();
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }
@@ -177,8 +180,29 @@ class TodayPrayersNotifier extends Notifier<TodayPrayersState> {
     try {
       await _databaseService.deletePrayer(id);
       await _loadTodayPrayers();
-      // Invalidate dependent providers to refresh their data
-      ref.invalidate(ledgerProvider);
+      _refreshDependents();
+    } catch (e) {
+      state = state.copyWith(error: e.toString());
+    }
+  }
+
+  /// Re-creates a previously deleted prayer record — the undo path for
+  /// [deletePrayer]. Inserts fresh (a new id) rather than reusing the old
+  /// one, since the row it belonged to is already gone.
+  Future<void> restorePrayer(Prayer prayer) async {
+    try {
+      await _databaseService.upsertPrayer(
+        Prayer(
+          prayerName: prayer.prayerName,
+          date: prayer.date,
+          status: prayer.status,
+          time: prayer.time,
+          notes: prayer.notes,
+          qadhaPaidAt: prayer.qadhaPaidAt,
+        ),
+      );
+      await _loadTodayPrayers();
+      _refreshDependents();
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }
@@ -190,8 +214,3 @@ final todayPrayersProvider =
     NotifierProvider<TodayPrayersNotifier, TodayPrayersState>(
       TodayPrayersNotifier.new,
     );
-
-/// Simplified provider for completed prayers count today
-final completedCountProvider = Provider<int>((ref) {
-  return ref.watch(todayPrayersProvider).completedCount;
-});
