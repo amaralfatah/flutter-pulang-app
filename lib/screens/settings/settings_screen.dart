@@ -1,4 +1,3 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -24,16 +23,18 @@ class SettingsScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(title: const Text('Pengaturan')),
       body: ListView(
-        padding: const EdgeInsets.only(bottom: 24, top: 8),
+        padding: const EdgeInsets.only(bottom: 24, top: 12),
         children: [
+          // Cards carry the grouping on their own now that most sections
+          // dropped their header, so they need more air between them.
           _buildLocationSection(context, ref, settings),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           _buildNotificationSection(context, ref, settings, notifier),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           _buildAppearanceSection(context, ref, settings, notifier),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           _buildBackupSection(context, ref, settings, notifier),
-          const SizedBox(height: 8),
+          const SizedBox(height: 12),
           _buildAboutSection(context, ref, settings),
         ],
       ),
@@ -43,7 +44,8 @@ class SettingsScreen extends ConsumerWidget {
   /// M3 list subheader: `titleSmall` in the primary colour (no ad-hoc bold).
   Widget _buildSectionHeader(BuildContext context, String title) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+      // Top spacing comes from the gap between cards now, so keep this tight.
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 8),
       child: Text(
         title,
         style: Theme.of(context).textTheme.titleSmall?.copyWith(
@@ -54,11 +56,19 @@ class SettingsScreen extends ConsumerWidget {
   }
 
   /// Groups a section's tiles inside a single M3 card surface.
-  Widget _buildSection(BuildContext context, String title, List<Widget> tiles) {
+  ///
+  /// [title] is optional: most sections here hold a single self-describing
+  /// tile, so a header would just repeat the tile's own label. Pass one only
+  /// when the grouping isn't obvious from the tiles themselves.
+  Widget _buildSection(
+    BuildContext context,
+    List<Widget> tiles, {
+    String? title,
+  }) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionHeader(context, title),
+        if (title != null) _buildSectionHeader(context, title),
         Card(
           margin: const EdgeInsets.symmetric(horizontal: 16),
           child: Column(children: tiles),
@@ -72,7 +82,7 @@ class SettingsScreen extends ConsumerWidget {
     WidgetRef ref,
     SettingsState settings,
   ) {
-    return _buildSection(context, 'Lokasi', [
+    return _buildSection(context, [
       ListTile(
         leading: _leadingIcon(context, Icons.location_on_outlined),
         title: Text(settings.cityName ?? 'Belum pilih kota'),
@@ -110,83 +120,13 @@ class SettingsScreen extends ConsumerWidget {
     SettingsState settings,
     SettingsNotifier notifier,
   ) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return _buildSection(context, 'Notifikasi', [
+    return _buildSection(context, [
       SwitchListTile(
         secondary: _leadingIcon(context, Icons.notifications_active_outlined),
         title: const Text('Aktifkan Notifikasi'),
         subtitle: const Text('Notifikasi saat masuk waktu solat'),
         value: settings.notificationEnabled,
         onChanged: (value) => notifier.setNotificationEnabled(value),
-      ),
-      // Diagnostics below are for development only — shipping them puts
-      // "(Debug)" entries in front of real users.
-      if (kDebugMode)
-      ListTile(
-        leading: _leadingIcon(
-          context,
-          Icons.notification_important_outlined,
-          container: colorScheme.tertiaryContainer,
-          foreground: colorScheme.tertiary,
-        ),
-        title: const Text('Test Notifikasi'),
-        subtitle: const Text('Kirim notifikasi sekarang (Debug)'),
-        onTap: () async {
-          final messenger = ScaffoldMessenger.of(context);
-          await ref.read(notificationServiceProvider).requestPermissions();
-          await ref
-              .read(notificationServiceProvider)
-              .showNotification(
-                id: 999,
-                title: 'Test Notifikasi',
-                body: 'Ini adalah contoh notifikasi waktu solat.',
-              );
-
-          messenger.showSnackBar(
-            AppSnackBar.info(
-              colorScheme,
-              'Notifikasi dikirim (Tunggu beberapa detik)',
-            ),
-          );
-        },
-      ),
-      if (kDebugMode)
-      ListTile(
-        leading: _leadingIcon(
-          context,
-          Icons.schedule_send_outlined,
-          container: colorScheme.tertiaryContainer,
-          foreground: colorScheme.tertiary,
-        ),
-        title: const Text('Test Notifikasi Terjadwal'),
-        subtitle: const Text(
-          'Jadwalkan via alarm, muncul 1 menit lagi (Debug)',
-        ),
-        onTap: () async {
-          final messenger = ScaffoldMessenger.of(context);
-          final service = ref.read(notificationServiceProvider);
-
-          final granted = await service.requestPermissions();
-          if (!granted) {
-            messenger.showSnackBar(
-              AppSnackBar.error(
-                colorScheme,
-                'Izin notifikasi belum diberikan. Aktifkan di pengaturan HP.',
-              ),
-            );
-            return;
-          }
-
-          final fireAt = await service.scheduleTestNotification();
-          final timeLabel = DateFormat('HH:mm:ss').format(fireAt);
-          messenger.showSnackBar(
-            AppSnackBar.info(
-              colorScheme,
-              'Alarm dijadwalkan pukul $timeLabel. '
-              'Biarkan/keluar app, notifikasi akan muncul.',
-            ),
-          );
-        },
       ),
     ]);
   }
@@ -219,7 +159,7 @@ class SettingsScreen extends ConsumerWidget {
       }
     }
 
-    return _buildSection(context, 'Tampilan', [
+    return _buildSection(context, [
       ListTile(
         leading: _leadingIcon(context, getThemeModeIcon(settings.themeMode)),
         title: const Text('Mode Tampilan'),
@@ -288,7 +228,7 @@ class SettingsScreen extends ConsumerWidget {
     final backupService = ref.read(backupServiceProvider);
     final colorScheme = Theme.of(context).colorScheme;
 
-    return _buildSection(context, 'Backup & Data', [
+    return _buildSection(context, [
       ListTile(
         leading: _leadingIcon(context, Icons.account_circle_outlined),
         title: Text(settings.googleAccountEmail ?? 'Belum Login Google'),
@@ -352,7 +292,7 @@ class SettingsScreen extends ConsumerWidget {
           onTap: () => _showRestoreDialog(context, ref),
         ),
       ],
-    ]);
+    ], title: 'Backup & Data');
   }
 
   /// Sign in to Google and restore the most recent backup.
@@ -551,6 +491,12 @@ class SettingsScreen extends ConsumerWidget {
           return StatefulBuilder(
             builder: (statefulContext, setDialogState) {
               return AlertDialog(
+                // Wider than the default 40px inset so each row fits the
+                // full "d MMM yyyy, HH:mm" label alongside the delete button.
+                insetPadding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 24,
+                ),
                 title: const Text('Pilih Backup untuk Dipulihkan'),
                 content: SizedBox(
                   width: double.maxFinite,
@@ -574,17 +520,16 @@ class SettingsScreen extends ConsumerWidget {
                             final isLatest = index == 0;
 
                             return ListTile(
-                              contentPadding: const EdgeInsets.symmetric(
-                                horizontal: 4,
-                              ),
+                              contentPadding: EdgeInsets.zero,
+                              horizontalTitleGap: 8,
+                              minLeadingWidth: 24,
                               leading: Icon(
                                 Icons.restore_rounded,
                                 color: colorScheme.primary,
                               ),
-                              title: Text(
-                                dateLabel,
-                                overflow: TextOverflow.ellipsis,
-                              ),
+                              // Wrap instead of ellipsizing: the dialog is
+                              // narrow and the date is the whole point here.
+                              title: Text(dateLabel, softWrap: true),
                               subtitle: isLatest
                                   ? Padding(
                                       padding: const EdgeInsets.only(top: 4),
@@ -620,6 +565,7 @@ class SettingsScreen extends ConsumerWidget {
                                   Icons.delete_outline_rounded,
                                   color: colorScheme.error,
                                 ),
+                                visualDensity: VisualDensity.compact,
                                 tooltip: 'Hapus backup',
                                 onPressed: () async {
                                   final fileId = file.id;
@@ -788,7 +734,7 @@ class SettingsScreen extends ConsumerWidget {
     SettingsState settings,
   ) {
     final colorScheme = Theme.of(context).colorScheme;
-    return _buildSection(context, 'Tentang Aplikasi', [
+    return _buildSection(context, [
       ListTile(
         leading: _leadingIcon(
           context,

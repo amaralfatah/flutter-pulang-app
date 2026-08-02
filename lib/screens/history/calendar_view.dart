@@ -55,6 +55,9 @@ class CalendarView extends ConsumerWidget {
             ref.read(calendarProvider.notifier).onPageChanged(focusedDay);
           },
           calendarFormat: CalendarFormat.month,
+          // Hanya swipe horizontal (ganti bulan). Swipe vertikal dibiarkan
+          // lewat ke ListView halaman supaya scroll ke bawah tetap enak.
+          availableGestures: AvailableGestures.horizontalSwipe,
           startingDayOfWeek: StartingDayOfWeek.monday,
           locale: 'id_ID',
           rowHeight: 52,
