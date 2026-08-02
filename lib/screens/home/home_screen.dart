@@ -26,15 +26,20 @@ class HomeScreen extends ConsumerWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Pulang'),
-        // actions: [
-        //   IconButton(
-        //     icon: const Icon(Icons.refresh_rounded),
-        //     onPressed: () {
-        //       prayerTimesNotifier.refresh();
-        //       todayPrayersNotifier.refresh();
-        //     },
-        //   ),
-        // ],
+        // Kiblat dan Pengaturan tinggal di sini, bukan di bottom nav: keduanya
+        // dibuka sesekali, jadi tidak layak menahan slot navigasi utama.
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.explore_outlined),
+            onPressed: () => context.push(AppRoutes.qibla),
+            tooltip: 'Kiblat',
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            onPressed: () => context.push(AppRoutes.settings),
+            tooltip: 'Pengaturan',
+          ),
+        ],
       ),
       body: RefreshIndicator(
         color: Theme.of(context).colorScheme.primary,
@@ -130,7 +135,7 @@ class HomeScreen extends ConsumerWidget {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8),
       child: InkWell(
-        onTap: () => context.go(AppRoutes.settings),
+        onTap: () => context.push(AppRoutes.settings),
         borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.fromLTRB(8, 12, 8, 8),
@@ -306,7 +311,7 @@ class HomeScreen extends ConsumerWidget {
           const SizedBox(height: 24),
           // An empty state without a way out forces the user to go hunting.
           FilledButton.icon(
-            onPressed: () => context.go(AppRoutes.settings),
+            onPressed: () => context.push(AppRoutes.settings),
             icon: const Icon(Icons.location_on_outlined),
             label: const Text('Pilih kota'),
           ),

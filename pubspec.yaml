@@ -63,6 +63,8 @@ dev_dependencies:
   # rules and activating additional ones.
   flutter_lints: ^6.0.0
   flutter_launcher_icons: ^0.14.4
+  # SQLite in-memory untuk menguji perhitungan buku besar qadha di desktop.
+  sqflite_common_ffi: ^2.3.4
 
 # App launcher icon generation. Source image lives in assets/icon/.
 # Regenerate after changing it with: dart run flutter_launcher_icons

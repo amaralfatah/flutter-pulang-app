@@ -8,42 +8,29 @@ import 'package:table_calendar/table_calendar.dart';
 import '../../app/extensions/color_scheme_extensions.dart';
 import '../../models/models.dart';
 import '../../providers/providers.dart';
+import '../../widgets/shared/app_snackbar.dart';
 import '../../widgets/shared/check_in_bottom_sheet.dart';
 import '../../widgets/shared/prayer_card.dart';
 
-/// Calendar Screen - Displays prayer attendance in calendar view
-/// Each segment in the ring represents individual prayer status
-class CalendarScreen extends ConsumerWidget {
-  const CalendarScreen({super.key});
+/// Tampilan kalender kehadiran solat. Setiap segmen pada cincin mewakili satu
+/// waktu solat. Dipakai sebagai salah satu segmen di layar Riwayat, jadi ia
+/// tidak membawa Scaffold maupun AppBar sendiri.
+class CalendarView extends ConsumerWidget {
+  const CalendarView({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(calendarProvider);
 
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Kalender Solat'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.today_rounded),
-            onPressed: () {
-              ref.read(calendarProvider.notifier).onPageChanged(DateTime.now());
-              ref.read(calendarProvider.notifier).selectDay(DateTime.now());
-            },
-            tooltip: 'Hari Ini',
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.only(bottom: 24),
-        children: [
-          const SizedBox(height: 8),
-          _buildCalendar(context, ref, state),
-          const SizedBox(height: 16),
-          if (state.selectedDay != null)
-            _buildSelectedDayDetail(context, ref, state),
-        ],
-      ),
+    return ListView(
+      padding: const EdgeInsets.only(bottom: 24),
+      children: [
+        const SizedBox(height: 8),
+        _buildCalendar(context, ref, state),
+        const SizedBox(height: 16),
+        if (state.selectedDay != null)
+          _buildSelectedDayDetail(context, ref, state),
+      ],
     );
   }
 
@@ -207,8 +194,9 @@ class CalendarScreen extends ConsumerWidget {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            // Progress ring (5 segments) - show for unselected days with any status
-            if (hasAnyStatus && !isSelected)
+            // Progress ring (5 segments) - tetap tampil walau hari terpilih,
+            // ring (40px) berada di luar lingkaran isian terpilih (36px).
+            if (hasAnyStatus)
               SizedBox(
                 width: 40,
                 height: 40,
@@ -403,11 +391,32 @@ class CalendarScreen extends ConsumerWidget {
     Prayer? existingPrayer,
     DateTime selectedDay,
   ) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final colorScheme = Theme.of(context).colorScheme;
+    final formattedDate = DateFormat(
+      'EEEE, d MMMM yyyy',
+      'id_ID',
+    ).format(selectedDay);
+
     await CheckInBottomSheet.show(
       context: context,
       prayerName: prayerName,
       currentStatus: existingPrayer?.status,
-      subtitle: DateFormat('EEEE, d MMMM yyyy', 'id_ID').format(selectedDay),
+      subtitle: formattedDate,
+      isOutstandingQadha: existingPrayer?.isOutstandingQadha ?? false,
+      onQadhaPaid: () async {
+        final paid = await ref
+            .read(calendarProvider.notifier)
+            .payQadhaForDate(date: selectedDay, prayerName: prayerName);
+        if (!paid) return;
+
+        messenger.showSnackBar(
+          AppSnackBar.success(
+            colorScheme,
+            'Qadha ${prayerName.displayName} $formattedDate tercatat lunas.',
+          ),
+        );
+      },
       onStatusSelected: (status) {
         ref
             .read(calendarProvider.notifier)

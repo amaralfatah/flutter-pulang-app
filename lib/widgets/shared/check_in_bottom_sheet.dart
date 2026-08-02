@@ -14,12 +14,23 @@ class CheckInBottomSheet extends StatelessWidget {
   final String? subtitle;
   final OnStatusSelected onStatusSelected;
 
+  /// Solat ini terlewat dan hutangnya belum dibayar.
+  final bool isOutstandingQadha;
+
+  /// Dipanggil saat user menyatakan hutang ini sudah diqadha. Tanpa jalur
+  /// tersendiri, satu-satunya cara melunasi dari Kalender adalah menimpa
+  /// statusnya jadi "Terlambat" — yang menghapus jejak bahwa solat ini pernah
+  /// terlewat lalu diqadha, dan membuatnya tak bisa dibatalkan.
+  final VoidCallback? onQadhaPaid;
+
   const CheckInBottomSheet({
     super.key,
     required this.prayerName,
     required this.onStatusSelected,
     this.currentStatus,
     this.subtitle,
+    this.isOutstandingQadha = false,
+    this.onQadhaPaid,
   });
 
   /// Show the check-in bottom sheet
@@ -29,6 +40,8 @@ class CheckInBottomSheet extends StatelessWidget {
     required OnStatusSelected onStatusSelected,
     PrayerStatus? currentStatus,
     String? subtitle,
+    bool isOutstandingQadha = false,
+    VoidCallback? onQadhaPaid,
   }) {
     return showModalBottomSheet(
       context: context,
@@ -43,6 +56,13 @@ class CheckInBottomSheet extends StatelessWidget {
         prayerName: prayerName,
         currentStatus: currentStatus,
         subtitle: subtitle,
+        isOutstandingQadha: isOutstandingQadha,
+        onQadhaPaid: onQadhaPaid == null
+            ? null
+            : () {
+                Navigator.pop(sheetContext);
+                onQadhaPaid();
+              },
         onStatusSelected: (status) {
           Navigator.pop(sheetContext);
           onStatusSelected(status);
@@ -84,6 +104,39 @@ class CheckInBottomSheet extends StatelessWidget {
             ],
 
             const SizedBox(height: 24),
+
+            // Melunasi hutang adalah maksud paling mungkin saat membuka solat
+            // yang terlewat, jadi ia ditaruh paling atas dan dipisahkan dari
+            // pilihan status biasa di bawahnya.
+            if (isOutstandingQadha && onQadhaPaid != null) ...[
+              FilledButton.icon(
+                onPressed: onQadhaPaid,
+                icon: const Icon(Icons.task_alt_rounded),
+                label: const Text('Sudah saya qadha'),
+                style: FilledButton.styleFrom(
+                  minimumSize: const Size.fromHeight(52),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Hutang ini ditandai lunas, tapi riwayatnya tetap tercatat '
+                'pernah terlewat.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 20),
+              Divider(color: colorScheme.outlineVariant),
+              const SizedBox(height: 20),
+              Text(
+                'Atau ubah statusnya:',
+                style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
 
             // On Time Option
             CheckInOption(

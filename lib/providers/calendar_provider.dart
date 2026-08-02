@@ -198,9 +198,30 @@ class CalendarNotifier extends Notifier<CalendarState> {
       await selectDay(date);
 
       // Invalidate related providers
-      ref.invalidate(statisticsProvider);
+      ref.invalidate(ledgerProvider);
     } catch (e) {
       state = state.copyWith(error: e.toString());
+    }
+  }
+
+  /// Lunasi hutang qadha pada tanggal dan waktu solat yang sedang dibuka.
+  /// Mengembalikan `false` kalau ternyata di sana tidak ada hutang.
+  Future<bool> payQadhaForDate({
+    required DateTime date,
+    required PrayerName prayerName,
+  }) async {
+    try {
+      final dateStr = CalendarState._formatDate(date);
+      final paid = await _databaseService.payQadhaFor(dateStr, prayerName);
+      if (paid == null) return false;
+
+      await _loadMonthPrayerStatus(date.year, date.month);
+      await selectDay(date);
+      ref.invalidate(ledgerProvider);
+      return true;
+    } catch (e) {
+      state = state.copyWith(error: e.toString());
+      return false;
     }
   }
 
@@ -214,7 +235,7 @@ class CalendarNotifier extends Notifier<CalendarState> {
       await selectDay(date);
 
       // Invalidate related providers
-      ref.invalidate(statisticsProvider);
+      ref.invalidate(ledgerProvider);
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }

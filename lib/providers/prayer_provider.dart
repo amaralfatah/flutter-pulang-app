@@ -2,7 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../models/models.dart';
 import '../services/services.dart';
-import 'statistics_provider.dart';
+import 'ledger_provider.dart';
 
 /// Database service provider (singleton)
 final databaseServiceProvider = Provider<DatabaseService>((ref) {
@@ -38,11 +38,10 @@ final backupServiceProvider = Provider<BackupService>((ref) {
 /// Date change service provider
 final dateChangeServiceProvider = Provider<DateChangeService>((ref) {
   final service = DateChangeService(
-    ref.watch(databaseServiceProvider),
     onDateChanged: () {
       // Invalidate providers when date changes
       ref.invalidate(todayPrayersProvider);
-      ref.invalidate(statisticsProvider);
+      ref.invalidate(ledgerProvider);
     },
   );
 
@@ -108,21 +107,8 @@ class TodayPrayersNotifier extends Notifier<TodayPrayersState> {
 
   @override
   TodayPrayersState build() {
-    // Mark missed prayers for yesterday when app starts
-    _initializeAndMarkMissed();
+    _loadTodayPrayers();
     return const TodayPrayersState(isLoading: true);
-  }
-
-  /// Initialize and mark missed prayers
-  Future<void> _initializeAndMarkMissed() async {
-    try {
-      // First, mark any missed prayers from yesterday
-      await _databaseService.markMissedPrayers();
-      // Then load today's prayers
-      await _loadTodayPrayers();
-    } catch (e) {
-      state = state.copyWith(error: e.toString(), isLoading: false);
-    }
   }
 
   static String _formatToday() {
@@ -168,7 +154,7 @@ class TodayPrayersNotifier extends Notifier<TodayPrayersState> {
       await _databaseService.upsertPrayer(prayer);
       await _loadTodayPrayers();
       // Invalidate dependent providers to refresh their data
-      ref.invalidate(statisticsProvider);
+      ref.invalidate(ledgerProvider);
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }
@@ -180,7 +166,7 @@ class TodayPrayersNotifier extends Notifier<TodayPrayersState> {
       await _databaseService.updatePrayer(prayer);
       await _loadTodayPrayers();
       // Invalidate dependent providers to refresh their data
-      ref.invalidate(statisticsProvider);
+      ref.invalidate(ledgerProvider);
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }
@@ -192,7 +178,7 @@ class TodayPrayersNotifier extends Notifier<TodayPrayersState> {
       await _databaseService.deletePrayer(id);
       await _loadTodayPrayers();
       // Invalidate dependent providers to refresh their data
-      ref.invalidate(statisticsProvider);
+      ref.invalidate(ledgerProvider);
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }

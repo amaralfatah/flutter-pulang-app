@@ -3,6 +3,23 @@ import 'package:flutter/material.dart';
 import '../../app/extensions/color_scheme_extensions.dart';
 import '../../models/models.dart';
 
+/// Ikon untuk tiap waktu solat. Dipakai bersama oleh kartu solat dan layar
+/// Qadha supaya satu waktu solat selalu tampil dengan ikon yang sama.
+IconData prayerIcon(PrayerName name) {
+  switch (name) {
+    case PrayerName.subuh:
+      return Icons.wb_twilight_rounded;
+    case PrayerName.dzuhur:
+      return Icons.wb_sunny_rounded;
+    case PrayerName.ashar:
+      return Icons.wb_cloudy_rounded;
+    case PrayerName.maghrib:
+      return Icons.nights_stay_rounded;
+    case PrayerName.isya:
+      return Icons.bedtime_rounded;
+  }
+}
+
 /// Shared Prayer Card Widget - displays prayer with emoji icon and status
 /// Used in both CalendarScreen and HomeScreen
 class PrayerCard extends StatelessWidget {
@@ -72,7 +89,7 @@ class PrayerCard extends StatelessWidget {
           child: Row(
             children: [
               // Prayer Icon (decorative - the name is announced as text)
-              Icon(_getIcon(prayerName), color: colorScheme.primary, size: 24),
+              Icon(prayerIcon(prayerName), color: colorScheme.primary, size: 24),
               const SizedBox(width: 16),
 
               // Prayer Name & Subtitle
@@ -81,7 +98,7 @@ class PrayerCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      _getDisplayName(prayerName),
+                      prayerName.displayName,
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
@@ -118,38 +135,6 @@ class PrayerCard extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  /// Get icon for prayer
-  IconData _getIcon(PrayerName name) {
-    switch (name) {
-      case PrayerName.subuh:
-        return Icons.wb_twilight_rounded;
-      case PrayerName.dzuhur:
-        return Icons.wb_sunny_rounded;
-      case PrayerName.ashar:
-        return Icons.wb_cloudy_rounded;
-      case PrayerName.maghrib:
-        return Icons.nights_stay_rounded;
-      case PrayerName.isya:
-        return Icons.bedtime_rounded;
-    }
-  }
-
-  /// Get display name for prayer
-  String _getDisplayName(PrayerName name) {
-    switch (name) {
-      case PrayerName.subuh:
-        return 'Subuh';
-      case PrayerName.dzuhur:
-        return 'Dzuhur';
-      case PrayerName.ashar:
-        return 'Ashar';
-      case PrayerName.maghrib:
-        return 'Maghrib';
-      case PrayerName.isya:
-        return 'Isya';
-    }
   }
 
   /// Get status text based on prayer status

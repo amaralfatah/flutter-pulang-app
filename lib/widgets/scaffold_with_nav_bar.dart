@@ -1,44 +1,49 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-class ScaffoldWithNavBar extends StatelessWidget {
+import '../providers/providers.dart';
+
+class ScaffoldWithNavBar extends ConsumerWidget {
   const ScaffoldWithNavBar({required this.navigationShell, super.key});
 
   /// The navigation shell and container for the branch Navigators.
   final StatefulNavigationShell navigationShell;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final outstandingQadha = ref.watch(outstandingQadhaProvider);
+
     return Scaffold(
       body: navigationShell,
       bottomNavigationBar: NavigationBar(
         selectedIndex: navigationShell.currentIndex,
         onDestinationSelected: (index) => _onTap(context, index),
-        destinations: const [
-          NavigationDestination(
+        destinations: [
+          const NavigationDestination(
             icon: Icon(Icons.home_outlined),
             selectedIcon: Icon(Icons.home_rounded),
             label: 'Home',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.calendar_month_outlined),
             selectedIcon: Icon(Icons.calendar_month_rounded),
-            label: 'Kalender',
+            label: 'Riwayat',
           ),
           NavigationDestination(
-            icon: Icon(Icons.bar_chart_outlined),
-            selectedIcon: Icon(Icons.bar_chart_rounded),
-            label: 'Statistik',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.explore_outlined),
-            selectedIcon: Icon(Icons.explore_rounded),
-            label: 'Kiblat',
-          ),
-          NavigationDestination(
-            icon: Icon(Icons.settings_outlined),
-            selectedIcon: Icon(Icons.settings_rounded),
-            label: 'Pengaturan',
+            // Jumlah hutang ditempel di ikon supaya tidak perlu membuka menunya
+            // dulu untuk tahu masih ada yang tertunggak.
+            icon: Badge(
+              isLabelVisible: outstandingQadha > 0,
+              label: Text('$outstandingQadha'),
+              child: const Icon(Icons.account_balance_wallet_outlined),
+            ),
+            selectedIcon: Badge(
+              isLabelVisible: outstandingQadha > 0,
+              label: Text('$outstandingQadha'),
+              child: const Icon(Icons.account_balance_wallet_rounded),
+            ),
+            label: 'Qadha',
           ),
         ],
       ),

@@ -44,6 +44,22 @@ extension PrayerStatusExtension on PrayerStatus {
 extension PrayerNameExtension on PrayerName {
   String get value => name;
 
+  /// Nama yang ditampilkan ke user.
+  String get displayName {
+    switch (this) {
+      case PrayerName.subuh:
+        return 'Subuh';
+      case PrayerName.dzuhur:
+        return 'Dzuhur';
+      case PrayerName.ashar:
+        return 'Ashar';
+      case PrayerName.maghrib:
+        return 'Maghrib';
+      case PrayerName.isya:
+        return 'Isya';
+    }
+  }
+
   static PrayerName fromString(String value) {
     return PrayerName.values.firstWhere(
       (e) => e.name == value.toLowerCase(),
@@ -61,6 +77,12 @@ class Prayer {
   final String? time; // Format: HH:mm
   final String? notes;
 
+  /// Tanggal (YYYY-MM-DD) saat solat terlewat ini diqadha. Hanya bermakna
+  /// untuk status [PrayerStatus.missed]: null = masih jadi hutang.
+  /// Statusnya sengaja tetap `missed` supaya riwayat "pernah terlewat" tidak
+  /// hilang setelah hutangnya dibayar.
+  final String? qadhaPaidAt;
+
   Prayer({
     this.id,
     required this.prayerName,
@@ -68,7 +90,16 @@ class Prayer {
     required this.status,
     this.time,
     this.notes,
+    this.qadhaPaidAt,
   });
+
+  /// Hutang qadha yang belum dibayar.
+  bool get isOutstandingQadha =>
+      status == PrayerStatus.missed && qadhaPaidAt == null;
+
+  /// Sudah dikerjakan, baik tepat waktu, terlambat, maupun lewat qadha.
+  bool get isFulfilled =>
+      status != PrayerStatus.missed || qadhaPaidAt != null;
 
   /// Convert to Map for SQLite storage
   Map<String, dynamic> toMap() => {
@@ -78,6 +109,7 @@ class Prayer {
     'status': status.value,
     'time': time,
     'notes': notes,
+    'qadha_paid_at': qadhaPaidAt,
   };
 
   /// Create Prayer from SQLite Map
@@ -88,6 +120,7 @@ class Prayer {
     status: PrayerStatusExtension.fromString(map['status'] as String),
     time: map['time'] as String?,
     notes: map['notes'] as String?,
+    qadhaPaidAt: map['qadha_paid_at'] as String?,
   );
 
   /// Convert to JSON for backup
@@ -104,6 +137,7 @@ class Prayer {
     PrayerStatus? status,
     String? time,
     String? notes,
+    String? qadhaPaidAt,
   }) {
     return Prayer(
       id: id ?? this.id,
@@ -112,12 +146,13 @@ class Prayer {
       status: status ?? this.status,
       time: time ?? this.time,
       notes: notes ?? this.notes,
+      qadhaPaidAt: qadhaPaidAt ?? this.qadhaPaidAt,
     );
   }
 
   @override
   String toString() {
-    return 'Prayer(id: $id, prayerName: ${prayerName.value}, date: $date, status: ${status.value}, time: $time)';
+    return 'Prayer(id: $id, prayerName: ${prayerName.value}, date: $date, status: ${status.value}, time: $time, qadhaPaidAt: $qadhaPaidAt)';
   }
 
   @override
@@ -129,9 +164,11 @@ class Prayer {
         other.date == date &&
         other.status == status &&
         other.time == time &&
-        other.notes == notes;
+        other.notes == notes &&
+        other.qadhaPaidAt == qadhaPaidAt;
   }
 
   @override
-  int get hashCode => Object.hash(id, prayerName, date, status, time, notes);
+  int get hashCode =>
+      Object.hash(id, prayerName, date, status, time, notes, qadhaPaidAt);
 }
