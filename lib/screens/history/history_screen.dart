@@ -5,9 +5,6 @@ import '../../providers/providers.dart';
 import 'calendar_view.dart';
 import 'statistics_view.dart';
 
-/// Dua cara melihat ke belakang.
-enum HistoryTab { calendar, statistics }
-
 /// Layar Riwayat — gabungan Kalender dan Statistik.
 ///
 /// Keduanya menjawab pertanyaan yang sama ("bagaimana catatan solatku?") dan
@@ -21,11 +18,10 @@ class HistoryScreen extends ConsumerStatefulWidget {
 }
 
 class _HistoryScreenState extends ConsumerState<HistoryScreen> {
-  HistoryTab _tab = HistoryTab.calendar;
-
   @override
   Widget build(BuildContext context) {
-    final isCalendar = _tab == HistoryTab.calendar;
+    final tab = ref.watch(historyTabProvider);
+    final isCalendar = tab == HistoryTab.calendar;
     // Fixed 56px overflows once system font scale grows the segmented
     // button's label text (Dynamic Type / large accessibility text sizes).
     final segmentedHeight = 56 * MediaQuery.textScalerOf(context).scale(1.0);
@@ -63,9 +59,10 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                   label: Text('Ringkasan'),
                 ),
               ],
-              selected: {_tab},
-              onSelectionChanged: (selection) =>
-                  setState(() => _tab = selection.first),
+              selected: {tab},
+              onSelectionChanged: (selection) => ref
+                  .read(historyTabProvider.notifier)
+                  .select(selection.first),
             ),
           ),
         ),

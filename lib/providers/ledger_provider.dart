@@ -23,10 +23,6 @@ class LedgerState {
   /// paling lama — daftar kerja utama layar Qadha.
   final List<QadhaDay> outstandingByDate;
 
-  /// Qadha yang terakhir dilunasi — jejak yang bisa ditelusuri dan dibatalkan
-  /// kapan saja, tidak bergantung pada snackbar yang keburu hilang.
-  final List<Prayer> recentlyPaid;
-
   final bool isLoading;
   final String? error;
 
@@ -36,7 +32,6 @@ class LedgerState {
     this.longestStreak = 0,
     this.incompleteDays = const [],
     this.outstandingByDate = const [],
-    this.recentlyPaid = const [],
     this.isLoading = false,
     this.error,
   });
@@ -47,7 +42,6 @@ class LedgerState {
     int? longestStreak,
     List<IncompleteDay>? incompleteDays,
     List<QadhaDay>? outstandingByDate,
-    List<Prayer>? recentlyPaid,
     bool? isLoading,
     String? error,
   }) {
@@ -57,7 +51,6 @@ class LedgerState {
       longestStreak: longestStreak ?? this.longestStreak,
       incompleteDays: incompleteDays ?? this.incompleteDays,
       outstandingByDate: outstandingByDate ?? this.outstandingByDate,
-      recentlyPaid: recentlyPaid ?? this.recentlyPaid,
       isLoading: isLoading ?? this.isLoading,
       error: error,
     );
@@ -82,7 +75,6 @@ class LedgerNotifier extends Notifier<LedgerState> {
       final longestStreak = await _db.getLongestStreak();
       final incompleteDays = await _db.getIncompleteDates();
       final outstandingByDate = await _db.getOutstandingByDate();
-      final recentlyPaid = await _db.getRecentlyPaidQadha();
 
       state = LedgerState(
         ledger: ledger,
@@ -90,7 +82,6 @@ class LedgerNotifier extends Notifier<LedgerState> {
         longestStreak: longestStreak,
         incompleteDays: incompleteDays,
         outstandingByDate: outstandingByDate,
-        recentlyPaid: recentlyPaid,
         isLoading: false,
       );
     } catch (e) {
@@ -103,27 +94,8 @@ class LedgerNotifier extends Notifier<LedgerState> {
     await _load();
   }
 
-  /// Intip hutang mana saja yang antre dibayar, tanpa mengubah apa pun. Dipakai
-  /// untuk memperlihatkan tanggal-tanggalnya sebelum user menekan konfirmasi.
-  Future<List<Prayer>> peekOutstandingQadha(PrayerName name, {int limit = 100}) =>
-      _db.getOutstandingQadha(name, limit: limit);
-
-  /// Lunasi [count] hutang qadha tertua untuk waktu solat tertentu sekaligus.
-  /// Mengembalikan baris yang dilunasi supaya pemanggil bisa menyebut
-  /// tanggalnya, atau kosong kalau ternyata sudah tidak ada hutang.
-  Future<List<Prayer>> payQadha(PrayerName name, {int count = 1}) async {
-    try {
-      final paid = await _db.payQadha(name, count: count);
-      if (paid.isNotEmpty) await _refreshDependents();
-      return paid;
-    } catch (e) {
-      state = state.copyWith(error: e.toString());
-      return const [];
-    }
-  }
-
-  /// Lunasi hutang pada tanggal dan waktu solat tertentu — sasarannya dipilih
-  /// langsung, bukan "yang tertua". Ini jalur untuk daftar kerja per tanggal.
+  /// Qadha sebuah solat yang terlewat: statusnya jadi "terlambat". Sasarannya
+  /// dipilih langsung, bukan "yang tertua".
   Future<Prayer?> payQadhaFor(String date, PrayerName name) async {
     try {
       final paid = await _db.payQadhaFor(date, name);
@@ -135,15 +107,14 @@ class LedgerNotifier extends Notifier<LedgerState> {
     }
   }
 
-  /// Kembalikan sekumpulan pelunasan jadi hutang lagi. Menerima daftar supaya
-  /// pembayaran borongan bisa dibatalkan utuh, bukan satu per satu.
+  /// Kembalikan sekumpulan qadha jadi hutang lagi. Menerima daftar supaya
+  /// pelunasan borongan bisa dibatalkan utuh, bukan satu per satu.
   Future<void> undoPayQadha(List<int> prayerIds) async {
     try {
-      var changed = false;
       for (final id in prayerIds) {
-        if (await _db.undoPayQadhaById(id)) changed = true;
+        await _db.markMissedAgain(id);
       }
-      if (changed) await _refreshDependents();
+      if (prayerIds.isNotEmpty) await _refreshDependents();
     } catch (e) {
       state = state.copyWith(error: e.toString());
     }

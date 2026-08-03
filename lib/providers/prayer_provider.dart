@@ -81,9 +81,8 @@ class TodayPrayersState {
     );
   }
 
-  /// Get completed prayers count
-  int get completedCount =>
-      prayers.where((p) => p.status != PrayerStatus.missed).length;
+  /// Get completed prayers count — hutang yang sudah diqadha ikut terhitung.
+  int get completedCount => prayers.where((p) => p.isFulfilled).length;
 
   /// Get prayer by name
   Prayer? getPrayerByName(PrayerName name) {
@@ -198,7 +197,6 @@ class TodayPrayersNotifier extends Notifier<TodayPrayersState> {
           status: prayer.status,
           time: prayer.time,
           notes: prayer.notes,
-          qadhaPaidAt: prayer.qadhaPaidAt,
         ),
       );
       await _loadTodayPrayers();

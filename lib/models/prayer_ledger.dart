@@ -5,11 +5,9 @@ class PrayerTally {
   final int onTime;
   final int late;
 
-  /// Terlewat dan belum diqadha — ini yang jadi hutang.
+  /// Masih ditandai terlewat — ini yang jadi hutang. Begitu diqadha, barisnya
+  /// pindah ke [late], jadi tidak ada kategori "terlewat tapi sudah dibayar".
   final int outstanding;
-
-  /// Terlewat tapi sudah diqadha.
-  final int qadhaPaid;
 
   /// Slot hari lampau yang tidak punya catatan sama sekali. Bukan hutang:
   /// aplikasi tidak tahu apakah solatnya dikerjakan atau tidak.
@@ -19,12 +17,11 @@ class PrayerTally {
     this.onTime = 0,
     this.late = 0,
     this.outstanding = 0,
-    this.qadhaPaid = 0,
     this.unrecorded = 0,
   });
 
-  /// Sudah dikerjakan — tepat waktu, terlambat, atau lunas lewat qadha.
-  int get fulfilled => onTime + late + qadhaPaid;
+  /// Sudah dikerjakan — tepat waktu maupun terlambat/qadha.
+  int get fulfilled => onTime + late;
 
   /// Slot yang statusnya sudah pasti (bukan "belum tercatat").
   int get known => fulfilled + outstanding;
@@ -40,7 +37,6 @@ class PrayerTally {
     onTime: onTime + other.onTime,
     late: late + other.late,
     outstanding: outstanding + other.outstanding,
-    qadhaPaid: qadhaPaid + other.qadhaPaid,
     unrecorded: unrecorded + other.unrecorded,
   );
 }

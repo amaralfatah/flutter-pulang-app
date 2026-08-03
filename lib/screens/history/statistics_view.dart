@@ -6,6 +6,7 @@ import '../../app/extensions/color_scheme_extensions.dart';
 import '../../models/models.dart';
 import '../../providers/providers.dart';
 import '../../widgets/shared/prayer_card.dart';
+import '../../widgets/shared/unconfirmed_days_sheet.dart';
 
 /// Ringkasan solat sepanjang riwayat pencatatan.
 ///
@@ -28,7 +29,6 @@ class StatisticsView extends ConsumerWidget {
     if (!state.hasData) return const _EmptyState();
 
     final ledger = state.ledger;
-    final overall = ledger.overall;
 
     return ListView(
       physics: const AlwaysScrollableScrollPhysics(),
@@ -80,7 +80,8 @@ class StatisticsView extends ConsumerWidget {
             tally: ledger.tallyFor(name),
           ),
         ),
-        if (overall.unrecorded > 0) _UnrecordedNote(count: overall.unrecorded),
+        if (state.incompleteDays.isNotEmpty)
+          _UnrecordedNote(incompleteDays: state.incompleteDays),
       ],
     );
   }
@@ -289,8 +290,7 @@ class _PrayerBreakdownTile extends StatelessWidget {
   String _summaryLine(PrayerTally tally) {
     final parts = <String>[
       '${tally.onTime} tepat waktu',
-      if (tally.late > 0) '${tally.late} terlambat',
-      if (tally.qadhaPaid > 0) '${tally.qadhaPaid} diqadha',
+      if (tally.late > 0) '${tally.late} qadha/terlambat',
       if (tally.outstanding > 0) '${tally.outstanding} hutang',
       if (tally.unrecorded > 0) '${tally.unrecorded} belum tercatat',
     ];
@@ -312,7 +312,6 @@ class _StatusBar extends StatelessWidget {
     final segments = <({int flex, Color color})>[
       (flex: tally.onTime, color: colorScheme.statusOnTime),
       (flex: tally.late, color: colorScheme.statusLate),
-      (flex: tally.qadhaPaid, color: colorScheme.tertiary.withValues(alpha: .5)),
       (flex: tally.outstanding, color: colorScheme.statusMissed),
       (flex: tally.unrecorded, color: colorScheme.outlineVariant),
     ].where((s) => s.flex > 0).toList();
@@ -356,64 +355,55 @@ class _StatCard extends StatelessWidget {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: colorScheme.tertiaryContainer,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                icon,
-                color: colorScheme.onTertiaryContainer,
-                size: 24,
-              ),
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    crossAxisAlignment: CrossAxisAlignment.baseline,
-                    textBaseline: TextBaseline.alphabetic,
-                    children: [
-                      Text(
-                        value,
-                        style: Theme.of(context).textTheme.headlineSmall
-                            ?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: colorScheme.tertiary,
-                              height: 1,
-                            ),
-                      ),
-                      const SizedBox(width: 4),
-                      Expanded(
-                        child: Text(
-                          unit,
-                          style: Theme.of(context).textTheme.labelSmall
-                              ?.copyWith(
-                                color: colorScheme.onSurfaceVariant,
-                                fontWeight: FontWeight.w600,
-                              ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
+            // Ikon + label dulu, angka besar di bawahnya: label dapat sisa lebar
+            // penuh sehingga "Terpanjang" tidak pernah terpotong.
+            Row(
+              children: [
+                Icon(icon, color: colorScheme.tertiary, size: 20),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
                     title,
+                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.baseline,
+              textBaseline: TextBaseline.alphabetic,
+              children: [
+                Flexible(
+                  child: Text(
+                    value,
+                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: colorScheme.tertiary,
+                      height: 1,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    unit,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                   ),
-                ],
-              ),
+                ),
+              ],
             ),
           ],
         ),
@@ -441,23 +431,43 @@ class _SectionHeader extends StatelessWidget {
   }
 }
 
-/// Menjelaskan kenapa ada slot yang tidak masuk hitungan persentase.
-class _UnrecordedNote extends StatelessWidget {
-  const _UnrecordedNote({required this.count});
+/// Menjelaskan kenapa ada slot yang tidak masuk hitungan persentase, dan
+/// membuka daftar tanggalnya kalau ditekan — jalur yang sama dengan yang
+/// dipakai di Qadha, supaya keduanya menunjuk ke satu tempat yang konsisten.
+class _UnrecordedNote extends ConsumerWidget {
+  const _UnrecordedNote({required this.incompleteDays});
 
-  final int count;
+  final List<IncompleteDay> incompleteDays;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
-      child: Text(
-        '$count slot tidak pernah tercatat dan tidak dihitung sebagai hutang. '
-        'Konfirmasi di menu Qadha kalau kamu ingat apa yang terjadi.',
-        style: Theme.of(
-          context,
-        ).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+    final count = incompleteDays.length;
+
+    return InkWell(
+      onTap: () => showUnconfirmedDaysPicker(context, ref, incompleteDays),
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Text(
+                count == 1
+                    ? '1 hari tidak pernah tercatat dan tidak dihitung sebagai hutang.'
+                    : '$count hari tidak pernah tercatat dan tidak dihitung sebagai hutang.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+            Icon(
+              Icons.chevron_right_rounded,
+              size: 18,
+              color: colorScheme.onSurfaceVariant,
+            ),
+          ],
+        ),
       ),
     );
   }

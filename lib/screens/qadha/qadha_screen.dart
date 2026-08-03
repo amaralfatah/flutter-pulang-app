@@ -5,17 +5,19 @@ import 'package:intl/intl.dart';
 import '../../app/extensions/color_scheme_extensions.dart';
 import '../../models/models.dart';
 import '../../providers/providers.dart';
-import '../../widgets/shared/app_snackbar.dart';
 import '../../widgets/shared/prayer_card.dart';
+import '../../widgets/shared/unconfirmed_days_sheet.dart';
 
-/// Layar Qadha — hutang solat sepanjang riwayat pencatatan.
+/// Layar Qadha — murni soal hutang solat sepanjang riwayat pencatatan.
 ///
 /// Hutang hanya berasal dari solat yang **kamu sendiri** tandai terlewat.
-/// Hari yang tidak tercatat sama sekali muncul terpisah sebagai ajakan
-/// konfirmasi, bukan langsung dihitung sebagai hutang.
-/// Cara mengurutkan hutang.
-enum QadhaGrouping { byDate, byPrayer }
-
+/// Hari yang tidak tercatat sama sekali bukan urusan layar ini — itu
+/// dikonfirmasi di Kalender, pada hari yang bersangkutan, supaya tanggalnya
+/// tidak pernah ambigu. Di sini hanya ada tautan ringkas ke sana.
+///
+/// Selalu dikelompokkan per tanggal: orang mengingat hutangnya sebagai
+/// "12 Januari saya bolong Subuh dan Isya", bukan sebagai "saya punya 2
+/// hutang Subuh".
 class QadhaScreen extends ConsumerStatefulWidget {
   const QadhaScreen({super.key});
 
@@ -24,47 +26,12 @@ class QadhaScreen extends ConsumerStatefulWidget {
 }
 
 class _QadhaScreenState extends ConsumerState<QadhaScreen> {
-  // Default per tanggal: orang mengingat hutangnya sebagai "12 Januari saya
-  // bolong Subuh dan Isya", bukan sebagai "saya punya 2 hutang Subuh".
-  QadhaGrouping _grouping = QadhaGrouping.byDate;
-
   @override
   Widget build(BuildContext context) {
     final state = ref.watch(ledgerProvider);
-    final byDate = _grouping == QadhaGrouping.byDate;
-    // Fixed 56px overflows once system font scale grows the segmented
-    // button's label text (Dynamic Type / large accessibility text sizes).
-    final segmentedHeight = 56 * MediaQuery.textScalerOf(context).scale(1.0);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Qadha'),
-        bottom: state.hasData
-            ? PreferredSize(
-                preferredSize: Size.fromHeight(segmentedHeight),
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
-                  child: SegmentedButton<QadhaGrouping>(
-                    segments: const [
-                      ButtonSegment(
-                        value: QadhaGrouping.byDate,
-                        icon: Icon(Icons.event_rounded),
-                        label: Text('Per Tanggal'),
-                      ),
-                      ButtonSegment(
-                        value: QadhaGrouping.byPrayer,
-                        icon: Icon(Icons.access_time_rounded),
-                        label: Text('Per Waktu'),
-                      ),
-                    ],
-                    selected: {_grouping},
-                    onSelectionChanged: (s) =>
-                        setState(() => _grouping = s.first),
-                  ),
-                ),
-              )
-            : null,
-      ),
+      appBar: AppBar(title: const Text('Qadha')),
       body: RefreshIndicator(
         color: Theme.of(context).colorScheme.primary,
         onRefresh: () => ref.read(ledgerProvider.notifier).refresh(),
@@ -84,63 +51,25 @@ class _QadhaScreenState extends ConsumerState<QadhaScreen> {
             else ...[
               _TotalCard(ledger: state.ledger),
               const SizedBox(height: 24),
-              if (byDate) ...[
-                if (state.outstandingByDate.isEmpty)
-                  const _NoDebtCard()
-                else ...[
-                  const _SectionHeader(
-                    title: 'Hutang per Tanggal',
-                    subtitle:
-                        'Ketuk waktu solat yang sudah kamu qadha. Tanggalnya '
-                        'terlihat jelas, dan bisa dibatalkan kapan saja.',
-                  ),
-                  // Key per tanggal: tanpa ini Flutter bisa memakai ulang state
-                  // sebuah kartu untuk tanggal lain saat daftar menyusut, dan
-                  // pilihan yang belum tersimpan berpindah ke hari yang salah.
-                  ...state.outstandingByDate.map(
-                    (day) => _QadhaDayCard(key: ValueKey(day.date), day: day),
-                  ),
-                ],
-              ] else ...[
-                _SectionHeader(
-                  title: 'Rincian per Waktu',
-                  subtitle: state.ledger.outstandingQadha > 0
-                      ? 'Untuk melunasi banyak sekaligus pada satu waktu solat.'
-                      : 'Tidak ada hutang yang tersisa.',
-                ),
-                ...PrayerName.values.map(
-                  (name) => _QadhaRow(
-                    prayerName: name,
-                    tally: state.ledger.tallyFor(name),
-                  ),
-                ),
-              ],
-              if (state.recentlyPaid.isNotEmpty) ...[
-                const SizedBox(height: 24),
+              if (state.outstandingByDate.isEmpty)
+                const _NoDebtCard()
+              else ...[
                 const _SectionHeader(
-                  title: 'Baru Saja Diqadha',
+                  title: 'Hutang per Tanggal',
                   subtitle:
-                      'Setiap pembayaran tercatat di sini dan bisa dibatalkan '
-                      'kapan saja — tidak perlu buru-buru menekan "urungkan".',
+                      'Ketuk waktu solat yang sudah kamu qadha. Tanggalnya '
+                      'terlihat jelas, dan bisa dibatalkan kapan saja.',
                 ),
-                ...state.recentlyPaid.map((p) => _PaidQadhaTile(prayer: p)),
+                // Key per tanggal: tanpa ini Flutter bisa memakai ulang state
+                // sebuah kartu untuk tanggal lain saat daftar menyusut, dan
+                // id yang sedang diproses (_paying) berpindah ke hari yang salah.
+                ...state.outstandingByDate.map(
+                  (day) => _QadhaDayCard(key: ValueKey(day.date), day: day),
+                ),
               ],
               if (state.incompleteDays.isNotEmpty) ...[
                 const SizedBox(height: 24),
-                _SectionHeader(
-                  title: 'Perlu Dikonfirmasi',
-                  subtitle:
-                      '${state.incompleteDays.length} hari tidak tercatat. '
-                      'Aplikasi tidak menebak — beri tahu apa yang terjadi.',
-                ),
-                ...state.incompleteDays
-                    .take(_visibleConfirmationDays)
-                    .map((day) => _ConfirmDayCard(day: day)),
-                if (state.incompleteDays.length > _visibleConfirmationDays)
-                  _RemainingHint(
-                    hidden:
-                        state.incompleteDays.length - _visibleConfirmationDays,
-                  ),
+                _UnconfirmedDaysRow(incompleteDays: state.incompleteDays),
               ],
             ],
           ],
@@ -148,10 +77,6 @@ class _QadhaScreenState extends ConsumerState<QadhaScreen> {
       ),
     );
   }
-
-  /// Hari yang ditawarkan sekaligus. Daftar panjang membuat layar ini terasa
-  /// seperti tagihan, bukan alat bantu — sisanya menyusul setelah dibereskan.
-  static const _visibleConfirmationDays = 7;
 }
 
 /// Ringkasan hutang keseluruhan.
@@ -232,9 +157,7 @@ class _TotalCard extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              overall.qadhaPaid > 0
-                  ? 'Sejak $since. Sudah kamu qadha: ${overall.qadhaPaid} solat.'
-                  : 'Dihitung sejak catatan pertamamu, $since.',
+              'Dihitung sejak catatan pertamamu, $since.',
               style: Theme.of(
                 context,
               ).textTheme.bodySmall?.copyWith(color: onContainer),
@@ -248,15 +171,10 @@ class _TotalCard extends StatelessWidget {
 
 /// Satu tanggal dengan hutang yang menempel padanya.
 ///
-/// Mengetuk sebuah waktu solat **tidak menyimpan apa pun** — ia hanya menandai
-/// pilihan. Data baru berubah setelah tombol simpan ditekan, dan tombol itu
-/// menyebutkan berapa yang akan dilunasi.
-///
-/// Ini disengaja: catatan solat terlalu sensitif untuk dipertaruhkan pada
-/// ketukan tunggal. Snackbar "urungkan" tidak cukup, karena ia menuntut user
-/// menyadari kesalahannya dalam hitungan detik — padahal justru salah ketuk
-/// yang tidak disadari itulah masalahnya. Dengan memilih dulu, salah ketuk
-/// tidak berbiaya: batalkan pilihannya, tidak ada yang pernah tertulis.
+/// Mengetuk sebuah waktu solat langsung melunasinya — sama seperti mengetuk
+/// solat di Home langsung mencatatnya. Salah ketuk tidak berbahaya: snackbar
+/// "urungkan" muncul seketika, dan pelunasan yang sudah lewat snackbar pun
+/// tetap bisa dibatalkan dari daftar "Baru Saja Diqadha" di bawah.
 class _QadhaDayCard extends ConsumerStatefulWidget {
   const _QadhaDayCard({super.key, required this.day});
 
@@ -267,33 +185,21 @@ class _QadhaDayCard extends ConsumerStatefulWidget {
 }
 
 class _QadhaDayCardState extends ConsumerState<_QadhaDayCard> {
-  /// Id baris yang sedang dipilih — masih di memori, belum tersimpan.
-  final Set<int> _selected = {};
-
-  /// Mencegah double-tap pada tombol simpan memicu dua kali penyimpanan
-  /// sementara permintaan pertama masih berjalan.
-  bool _isSaving = false;
+  /// Id baris yang sedang diproses — dikunci sementara supaya tap ganda tidak
+  /// memicu dua kali pelunasan sebelum permintaan pertama selesai.
+  final Set<int> _paying = {};
 
   QadhaDay get _day => widget.day;
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final parsed = DateTime.parse(_day.date);
     final weekday = DateFormat('EEEE', 'id_ID').format(parsed);
     final formatted = DateFormat('d MMMM yyyy', 'id_ID').format(parsed);
-    final hasSelection = _selected.isNotEmpty;
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      // Kartu yang punya pilihan tertunda diberi garis tepi supaya jelas ada
-      // sesuatu yang menunggu diselesaikan di sini.
-      shape: hasSelection
-          ? RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: colorScheme.primary, width: 2),
-            )
-          : null,
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -344,69 +250,34 @@ class _QadhaDayCardState extends ConsumerState<_QadhaDayCard> {
               runSpacing: 8,
               children: _day.prayers.map((prayer) {
                 final id = prayer.id!;
-                final isSelected = _selected.contains(id);
-                return FilterChip(
-                  avatar: isSelected
-                      ? null
+                final isPaying = _paying.contains(id);
+                return ActionChip(
+                  avatar: isPaying
+                      ? SizedBox(
+                          width: 18,
+                          height: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        )
                       : Icon(
                           prayerIcon(prayer.prayerName),
                           size: 18,
                           color: colorScheme.onSurfaceVariant,
                         ),
                   label: Text(prayer.prayerName.displayName),
-                  selected: isSelected,
-                  onSelected: (value) => setState(() {
-                    if (value) {
-                      _selected.add(id);
-                    } else {
-                      _selected.remove(id);
-                    }
-                  }),
+                  onPressed: isPaying ? null : () => _payOne(prayer),
                 );
               }).toList(),
             ),
-            if (hasSelection) ...[
-              const SizedBox(height: 16),
-              Text(
-                'Belum tersimpan. Periksa dulu pilihanmu.',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => setState(_selected.clear),
-                      child: const Text('Batal'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    flex: 2,
-                    child: FilledButton(
-                      onPressed: _isSaving ? null : _save,
-                      child: _isSaving
-                          ? const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Text('Tandai ${_selected.length} lunas'),
-                    ),
-                  ),
-                ],
-              ),
-            ] else if (_day.prayers.length > 1) ...[
+            if (_day.prayers.length > 1) ...[
               const SizedBox(height: 4),
               Align(
                 alignment: Alignment.centerRight,
                 child: TextButton(
-                  onPressed: () => setState(
-                    () => _selected.addAll(_day.prayers.map((p) => p.id!)),
-                  ),
-                  child: const Text('Pilih semua'),
+                  onPressed: _paying.isEmpty ? _payAll : null,
+                  child: const Text('Tandai semua lunas'),
                 ),
               ),
             ],
@@ -416,25 +287,52 @@ class _QadhaDayCardState extends ConsumerState<_QadhaDayCard> {
     );
   }
 
-  Future<void> _save() async {
-    setState(() => _isSaving = true);
+  /// Melunasi satu waktu solat — dipanggil langsung saat chip-nya diketuk.
+  Future<void> _payOne(Prayer prayer) async {
+    final id = prayer.id!;
+    final date = _day.date;
+    setState(() => _paying.add(id));
     final messenger = ScaffoldMessenger.of(context);
     final notifier = ref.read(ledgerProvider.notifier);
-    final chosen = _day.prayers.where((p) => _selected.contains(p.id!));
+
+    final paid = await notifier.payQadhaFor(date, prayer.prayerName);
+
+    if (mounted) setState(() => _paying.remove(id));
+    if (paid == null) return;
+
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text('${prayer.prayerName.displayName} ${_shortDate(date)} lunas.'),
+        // Lihat catatan di home_screen: tanpa ini snackbar tidak hilang sendiri.
+        persist: false,
+        action: SnackBarAction(
+          label: 'Urungkan',
+          onPressed: () => notifier.undoPayQadha([paid.id!]),
+        ),
+      ),
+    );
+  }
+
+  /// Melunasi seluruh hutang hari ini sekaligus, satu snackbar untuk semua.
+  Future<void> _payAll() async {
+    final date = _day.date;
+    final prayers = _day.prayers;
+    setState(() => _paying.addAll(prayers.map((p) => p.id!)));
+    final messenger = ScaffoldMessenger.of(context);
+    final notifier = ref.read(ledgerProvider.notifier);
 
     final ids = <int>[];
-    for (final prayer in chosen) {
-      final paid = await notifier.payQadhaFor(_day.date, prayer.prayerName);
+    for (final prayer in prayers) {
+      final paid = await notifier.payQadhaFor(date, prayer.prayerName);
       if (paid != null) ids.add(paid.id!);
+      if (mounted) setState(() => _paying.remove(prayer.id!));
     }
 
-    if (mounted) setState(() => _isSaving = false);
     if (ids.isEmpty) return;
 
     messenger.showSnackBar(
       SnackBar(
-        content: Text('${ids.length} qadha ${_shortDate(_day.date)} lunas.'),
-        // Lihat catatan di home_screen: tanpa ini snackbar tidak hilang sendiri.
+        content: Text('${ids.length} qadha ${_shortDate(date)} lunas.'),
         persist: false,
         action: SnackBarAction(
           label: 'Urungkan',
@@ -473,501 +371,59 @@ class _NoDebtCard extends StatelessWidget {
   }
 }
 
-/// Satu baris waktu solat: sisa hutang + tombol bayar.
-class _QadhaRow extends ConsumerWidget {
-  const _QadhaRow({required this.prayerName, required this.tally});
-
-  final PrayerName prayerName;
-  final PrayerTally tally;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final hasDebt = tally.outstanding > 0;
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 12, 12, 12),
-        child: Row(
-          children: [
-            Icon(prayerIcon(prayerName), color: colorScheme.primary, size: 24),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    prayerName.displayName,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    hasDebt
-                        ? '${tally.outstanding} belum dibayar'
-                        : 'Lunas',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: hasDebt
-                          ? colorScheme.error
-                          : colorScheme.onSurfaceVariant,
-                      fontWeight: hasDebt ? FontWeight.w600 : null,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            if (hasDebt)
-              FilledButton.tonal(
-                onPressed: () => _pay(context, ref),
-                child: const Text('Bayar'),
-              )
-            else if (tally.qadhaPaid > 0)
-              Icon(Icons.check_circle_rounded, color: colorScheme.primary),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Mencatat qadha itu keputusan, bukan penghitung yang boleh ditekan cepat.
-  /// Jadi tanggal hutang yang akan dilunasi ditunjukkan lebih dulu — user tahu
-  /// persis apa yang berubah sebelum menyetujuinya. Jumlahnya bisa disetel di
-  /// lembar yang sama supaya melunasi banyak sekaligus tetap satu keputusan.
-  Future<void> _pay(BuildContext context, WidgetRef ref) async {
-    final colorScheme = Theme.of(context).colorScheme;
-    final messenger = ScaffoldMessenger.of(context);
-    final notifier = ref.read(ledgerProvider.notifier);
-
-    final queue = await notifier.peekOutstandingQadha(prayerName);
-    if (!context.mounted) return;
-    if (queue.isEmpty) {
-      messenger.showSnackBar(
-        AppSnackBar.info(
-          colorScheme,
-          'Tidak ada hutang ${prayerName.displayName}.',
-        ),
-      );
-      return;
-    }
-
-    final count = await showModalBottomSheet<int>(
-      context: context,
-      isScrollControlled: true,
-      builder: (sheetContext) =>
-          _PayConfirmSheet(prayerName: prayerName, queue: queue),
-    );
-    if (count == null || count < 1) return;
-
-    final paid = await notifier.payQadha(prayerName, count: count);
-    if (paid.isEmpty) return;
-
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          paid.length == 1
-              ? '${prayerName.displayName} ${_shortDate(paid.first.date)} tercatat lunas.'
-              : '${paid.length} qadha ${prayerName.displayName} tercatat lunas.',
-        ),
-        // Lihat catatan di home_screen: tanpa ini snackbar tidak hilang sendiri.
-        persist: false,
-        action: SnackBarAction(
-          label: 'Urungkan',
-          onPressed: () =>
-              notifier.undoPayQadha(paid.map((p) => p.id!).toList()),
-        ),
-      ),
-    );
-  }
-}
-
-/// Lembar konfirmasi pembayaran: menyebut tanggal hutangnya dengan jelas dan
-/// membiarkan user menentukan berapa banyak yang dilunasi sekali jalan.
-class _PayConfirmSheet extends StatefulWidget {
-  const _PayConfirmSheet({required this.prayerName, required this.queue});
-
-  final PrayerName prayerName;
-
-  /// Hutang yang mengantre, tertua dulu.
-  final List<Prayer> queue;
-
-  @override
-  State<_PayConfirmSheet> createState() => _PayConfirmSheetState();
-}
-
-class _PayConfirmSheetState extends State<_PayConfirmSheet> {
-  int _count = 1;
-
-  int get _max => widget.queue.length;
-
-  /// Tanggal-tanggal yang akan tersentuh oleh pilihan saat ini.
-  List<Prayer> get _selected => widget.queue.take(_count).toList();
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final name = widget.prayerName.displayName;
-    final remaining = _max - _count;
-
-    return SafeArea(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  prayerIcon(widget.prayerName),
-                  color: colorScheme.primary,
-                  size: 24,
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  'Qadha $name',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 20),
-            Text(
-              'Berapa qadha $name yang sudah kamu kerjakan?',
-              style: Theme.of(
-                context,
-              ).textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
-            ),
-            const SizedBox(height: 12),
-            _CountStepper(
-              value: _count,
-              max: _max,
-              onChanged: (value) => setState(() => _count = value),
-            ),
-            const SizedBox(height: 20),
-            Text(
-              _count == 1
-                  ? 'Tanggal yang akan ditandai lunas:'
-                  : 'Tanggal yang akan ditandai lunas ($_count tertua):',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-            ),
-            const SizedBox(height: 8),
-            // Daftarnya ditampilkan utuh, bukan diringkas jadi rentang: user
-            // harus bisa memastikan tanggal mana persisnya yang berubah.
-            Container(
-              width: double.infinity,
-              constraints: const BoxConstraints(maxHeight: 180),
-              padding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 12,
-              ),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainerHighest,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Scrollbar(
-                child: ListView(
-                  shrinkWrap: true,
-                  children: _selected
-                      .map(
-                        (p) => Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 3),
-                          child: Text(
-                            DateFormat(
-                              'EEEE, d MMMM yyyy',
-                              'id_ID',
-                            ).format(DateTime.parse(p.date)),
-                            style: Theme.of(context).textTheme.bodyMedium
-                                ?.copyWith(fontWeight: FontWeight.w600),
-                          ),
-                        ),
-                      )
-                      .toList(),
-                ),
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              remaining > 0
-                  ? 'Sisa hutang $name setelah ini: $remaining.'
-                  : 'Setelah ini hutang $name lunas semua.',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-            ),
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
-                    child: const Text('Batal'),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: () => Navigator.pop(context, _count),
-                    child: Text(
-                      _count == 1 ? 'Tandai Lunas' : 'Tandai $_count Lunas',
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// Pemilih jumlah dengan tombol tambah/kurang.
-class _CountStepper extends StatelessWidget {
-  const _CountStepper({
-    required this.value,
-    required this.max,
-    required this.onChanged,
-  });
-
-  final int value;
-  final int max;
-  final ValueChanged<int> onChanged;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Row(
-      children: [
-        IconButton.filledTonal(
-          onPressed: value > 1 ? () => onChanged(value - 1) : null,
-          icon: const Icon(Icons.remove_rounded),
-          tooltip: 'Kurangi',
-        ),
-        Expanded(
-          child: Center(
-            child: Text(
-              '$value',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: colorScheme.primary,
-              ),
-            ),
-          ),
-        ),
-        IconButton.filledTonal(
-          onPressed: value < max ? () => onChanged(value + 1) : null,
-          icon: const Icon(Icons.add_rounded),
-          tooltip: 'Tambah',
-        ),
-        if (max > 1) ...[
-          const SizedBox(width: 8),
-          TextButton(
-            onPressed: value == max ? null : () => onChanged(max),
-            child: const Text('Semua'),
-          ),
-        ],
-      ],
-    );
-  }
-}
-
-/// Satu pembayaran qadha yang sudah tercatat, lengkap dengan tombol batal.
-class _PaidQadhaTile extends ConsumerWidget {
-  const _PaidQadhaTile({required this.prayer});
-
-  final Prayer prayer;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
-        child: Row(
-          children: [
-            Icon(
-              Icons.check_circle_rounded,
-              color: colorScheme.primary,
-              size: 20,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${prayer.prayerName.displayName} · ${_shortDate(prayer.date)}',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Text(
-                    'Diqadha ${_paidWhen(prayer.qadhaPaidAt)}',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            TextButton(
-              onPressed: () =>
-                  ref.read(ledgerProvider.notifier).undoPayQadha([prayer.id!]),
-              child: const Text('Batal'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  String _paidWhen(String? isoTimestamp) {
-    if (isoTimestamp == null) return '-';
-    final parsed = DateTime.tryParse(isoTimestamp);
-    if (parsed == null) return '-';
-    return DateFormat('d MMM yyyy, HH:mm', 'id_ID').format(parsed);
-  }
-}
-
 String _shortDate(String date) =>
     DateFormat('d MMM yyyy', 'id_ID').format(DateTime.parse(date));
 
-/// Kartu untuk satu hari yang catatannya belum lengkap.
-class _ConfirmDayCard extends ConsumerWidget {
-  const _ConfirmDayCard({required this.day});
+/// Tautan ringkas ke hari-hari yang belum tercatat — bukan urusan Qadha.
+///
+/// Konfirmasinya (sudah solat / terlewat) dilakukan di Kalender, tepat pada
+/// hari yang bersangkutan, supaya tanggalnya tidak pernah ambigu. Menekan
+/// baris ini membuka daftar tanggalnya; memilih satu langsung melompat ke
+/// hari itu di Kalender — tidak perlu menyelesaikan yang tertua dulu, dan
+/// tidak perlu scroll kalender bulan demi bulan untuk menemukannya.
+class _UnconfirmedDaysRow extends ConsumerWidget {
+  const _UnconfirmedDaysRow({required this.incompleteDays});
 
-  final IncompleteDay day;
+  final List<IncompleteDay> incompleteDays;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
-    final missing = 5 - day.recorded;
-    final formatted = DateFormat(
-      'EEEE, d MMMM yyyy',
-      'id_ID',
-    ).format(DateTime.parse(day.date));
+    final count = incompleteDays.length;
 
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              formatted,
-              style: Theme.of(
-                context,
-              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              '$missing waktu belum tercatat',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _confirm(context, ref, PrayerStatus.late),
-                    icon: const Icon(Icons.check_rounded, size: 18),
-                    label: const Text('Solat'),
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      color: colorScheme.surfaceContainerHighest,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(12),
+        onTap: () => showUnconfirmedDaysPicker(context, ref, incompleteDays),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Icon(
+                Icons.event_busy_rounded,
+                color: colorScheme.onSurfaceVariant,
+                size: 22,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  count == 1
+                      ? '1 hari belum tercatat'
+                      : '$count hari belum tercatat',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () =>
-                        _confirm(context, ref, PrayerStatus.missed),
-                    icon: const Icon(Icons.close_rounded, size: 18),
-                    label: const Text('Terlewat'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: colorScheme.error,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Satu ketukan di sini mengubah lima slot sekaligus, jadi tanggal dan
-  /// akibatnya dieja dulu. Menandai terlewat menambah hutang qadha — itu bukan
-  /// hal yang pantas terjadi karena jempol yang meleset.
-  Future<void> _confirm(
-    BuildContext context,
-    WidgetRef ref,
-    PrayerStatus status,
-  ) async {
-    final colorScheme = Theme.of(context).colorScheme;
-    final messenger = ScaffoldMessenger.of(context);
-    final notifier = ref.read(ledgerProvider.notifier);
-    final missing = 5 - day.recorded;
-    final isMissed = status == PrayerStatus.missed;
-    final formatted = DateFormat(
-      'EEEE, d MMMM yyyy',
-      'id_ID',
-    ).format(DateTime.parse(day.date));
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (dialogContext) => AlertDialog(
-        title: Text(isMissed ? 'Tandai Terlewat?' : 'Tandai Sudah Solat?'),
-        content: Text(
-          isMissed
-              ? '$missing waktu pada $formatted akan dicatat terlewat dan '
-                    'menambah hutang qadha sebanyak $missing.'
-              : '$missing waktu pada $formatted akan dicatat sudah dikerjakan.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Batal'),
+              ),
+              Icon(
+                Icons.arrow_forward_rounded,
+                color: colorScheme.onSurfaceVariant,
+                size: 20,
+              ),
+            ],
           ),
-          FilledButton(
-            onPressed: () => Navigator.pop(dialogContext, true),
-            style: isMissed
-                ? FilledButton.styleFrom(
-                    backgroundColor: colorScheme.error,
-                    foregroundColor: colorScheme.onError,
-                  )
-                : null,
-            child: Text(isMissed ? 'Ya, terlewat' : 'Ya, sudah'),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-
-    final ids = await notifier.confirmDay(day.date, status);
-    if (ids.isEmpty) return;
-
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text(
-          isMissed
-              ? '$formatted dicatat terlewat.'
-              : '$formatted dicatat sudah dikerjakan.',
-        ),
-        // Lihat catatan di home_screen: tanpa ini snackbar tidak hilang sendiri.
-        persist: false,
-        action: SnackBarAction(
-          label: 'Urungkan',
-          onPressed: () => notifier.undoConfirmDay(ids),
         ),
       ),
     );
@@ -1004,26 +460,6 @@ class _SectionHeader extends StatelessWidget {
             ),
           ],
         ],
-      ),
-    );
-  }
-}
-
-class _RemainingHint extends StatelessWidget {
-  const _RemainingHint({required this.hidden});
-
-  final int hidden;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-      child: Text(
-        'Masih ada $hidden hari lagi. Beres dulu yang di atas, sisanya muncul menyusul.',
-        style: Theme.of(
-          context,
-        ).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
       ),
     );
   }

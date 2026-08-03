@@ -116,8 +116,16 @@ class CalendarNotifier extends Notifier<CalendarState> {
 
   /// Initialize calendar with today's data
   Future<void> _initializeWithToday(DateTime today) async {
-    await _loadMonthPrayerStatus(today.year, today.month);
+    await _loadMonthPrayerStatus(_monthsAround(today));
     await _loadSelectedDayPrayers(today);
+  }
+
+  /// Bulan-bulan yang perlu dimuat agar seluruh halaman kalender terisi. Dalam
+  /// mode minggu satu baris bisa melintasi pergantian bulan (mis. 29 Nov–5 Des),
+  /// jadi memuat bulan [day] saja akan menyisakan tanggal tanpa cincin.
+  static List<DateTime> _monthsAround(DateTime day) {
+    final weekStart = day.subtract(Duration(days: day.weekday - 1));
+    return [day, weekStart, weekStart.add(const Duration(days: 6))];
   }
 
   /// Load prayers for a selected day (internal helper)
@@ -131,10 +139,17 @@ class CalendarNotifier extends Notifier<CalendarState> {
     }
   }
 
-  /// Load prayer status for all days in a month
-  Future<void> _loadMonthPrayerStatus(int year, int month) async {
+  /// Load prayer status for every day in [months] (duplikat bulan diabaikan).
+  Future<void> _loadMonthPrayerStatus(List<DateTime> months) async {
     try {
-      final prayers = await _databaseService.getMonthPrayers(year, month);
+      final loaded = <String>{};
+      final prayers = <Prayer>[];
+      for (final month in months) {
+        if (!loaded.add('${month.year}-${month.month}')) continue;
+        prayers.addAll(
+          await _databaseService.getMonthPrayers(month.year, month.month),
+        );
+      }
 
       // Group prayers by date
       final Map<String, List<Prayer>> prayersByDate = {};
@@ -157,7 +172,7 @@ class CalendarNotifier extends Notifier<CalendarState> {
   /// Change focused month (when user swipes calendar)
   Future<void> onPageChanged(DateTime focusedDay) async {
     state = state.copyWith(focusedDay: focusedDay, isLoading: true);
-    await _loadMonthPrayerStatus(focusedDay.year, focusedDay.month);
+    await _loadMonthPrayerStatus(_monthsAround(focusedDay));
   }
 
   /// Select a day
@@ -166,11 +181,21 @@ class CalendarNotifier extends Notifier<CalendarState> {
     await _loadSelectedDayPrayers(selectedDay);
   }
 
+  /// Muat ulang setelah mengubah catatan — sengaja tanpa menyalakan
+  /// `isLoading`. Lewat [selectDay], daftar solat hari terpilih sempat diganti
+  /// spinner: isi ListView menyusut, posisi gulir ikut ter-clamp ke atas, dan
+  /// setelah data kembali pengguna harus menggulir turun lagi.
+  Future<void> _reloadAfterMutation(DateTime date) async {
+    await _loadMonthPrayerStatus([date, ..._monthsAround(state.focusedDay)]);
+    state = state.copyWith(selectedDay: date);
+    await _loadSelectedDayPrayers(date);
+  }
+
   /// Refresh current month
   Future<void> refresh() async {
     final focused = state.focusedDay;
     state = state.copyWith(isLoading: true);
-    await _loadMonthPrayerStatus(focused.year, focused.month);
+    await _loadMonthPrayerStatus(_monthsAround(focused));
 
     // Also refresh selected day if any
     if (state.selectedDay != null) {
@@ -200,34 +225,10 @@ class CalendarNotifier extends Notifier<CalendarState> {
       );
       await _databaseService.upsertPrayer(prayer);
 
-      // Refresh data
-      await _loadMonthPrayerStatus(date.year, date.month);
-      await selectDay(date);
-
+      await _reloadAfterMutation(date);
       _invalidateDependents();
     } catch (e) {
       state = state.copyWith(error: e.toString());
-    }
-  }
-
-  /// Lunasi hutang qadha pada tanggal dan waktu solat yang sedang dibuka.
-  /// Mengembalikan `false` kalau ternyata di sana tidak ada hutang.
-  Future<bool> payQadhaForDate({
-    required DateTime date,
-    required PrayerName prayerName,
-  }) async {
-    try {
-      final dateStr = CalendarState._formatDate(date);
-      final paid = await _databaseService.payQadhaFor(dateStr, prayerName);
-      if (paid == null) return false;
-
-      await _loadMonthPrayerStatus(date.year, date.month);
-      await selectDay(date);
-      _invalidateDependents();
-      return true;
-    } catch (e) {
-      state = state.copyWith(error: e.toString());
-      return false;
     }
   }
 
@@ -236,10 +237,7 @@ class CalendarNotifier extends Notifier<CalendarState> {
     try {
       await _databaseService.deletePrayer(prayerId);
 
-      // Refresh data
-      await _loadMonthPrayerStatus(date.year, date.month);
-      await selectDay(date);
-
+      await _reloadAfterMutation(date);
       _invalidateDependents();
     } catch (e) {
       state = state.copyWith(error: e.toString());

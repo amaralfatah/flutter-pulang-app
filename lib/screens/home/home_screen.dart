@@ -9,7 +9,6 @@ import '../../providers/providers.dart';
 import '../../widgets/home/prayer_timer_card.dart';
 import '../../widgets/shared/prayer_card.dart';
 import '../../widgets/shared/check_in_bottom_sheet.dart';
-import '../../widgets/shared/app_snackbar.dart';
 
 class HomeScreen extends ConsumerWidget {
   const HomeScreen({super.key});
@@ -410,55 +409,23 @@ class HomeScreen extends ConsumerWidget {
       context: context,
       prayerName: name,
       currentStatus: existingRecord?.status,
-      isOutstandingQadha: existingRecord?.isOutstandingQadha ?? false,
-      onQadhaPaid: existingRecord == null
-          ? null
-          : () => _handleQadhaPaid(context, ref, name, existingRecord),
       onDelete: existingRecord == null
           ? null
           : () => _handleDelete(context, ref, name, existingRecord),
       onStatusSelected: (status) =>
-          _handleStatusSelected(context, ref, name, status, existingRecord),
+          _handleStatusSelected(context, ref, name, status),
     );
   }
 
-  /// Menyimpan status baru, lalu menawarkan "Urungkan" — mengembalikan catatan
-  /// sebelumnya (jika ada) atau menghapus catatan yang baru dibuat.
   Future<void> _handleStatusSelected(
     BuildContext context,
     WidgetRef ref,
     PrayerName name,
     PrayerStatus status,
-    Prayer? previousRecord,
   ) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final notifier = ref.read(todayPrayersProvider.notifier);
-
-    await notifier.checkIn(prayerName: name, status: status);
-    if (!context.mounted) return;
-
-    // checkIn() awaits its own reload, so the fresh id is already available.
-    final newRecord = ref.read(todayPrayersProvider).getPrayerByName(name);
-
-    messenger.showSnackBar(
-      SnackBar(
-        content: Text('${name.displayName} dicatat: ${_statusLabel(status)}.'),
-        // Sejak Flutter 3.44 `persist` default-nya `action != null`, jadi
-        // snackbar ber-aksi menempel di layar sampai digeser manual. Kita mau
-        // perilaku lama: hilang sendiri setelah 4 detik.
-        persist: false,
-        action: SnackBarAction(
-          label: 'Urungkan',
-          onPressed: () {
-            if (previousRecord != null) {
-              notifier.updatePrayer(previousRecord);
-            } else if (newRecord?.id != null) {
-              notifier.deletePrayer(newRecord!.id!);
-            }
-          },
-        ),
-      ),
-    );
+    await ref
+        .read(todayPrayersProvider.notifier)
+        .checkIn(prayerName: name, status: status);
   }
 
   Future<void> _handleDelete(
@@ -485,36 +452,4 @@ class HomeScreen extends ConsumerWidget {
     );
   }
 
-  Future<void> _handleQadhaPaid(
-    BuildContext context,
-    WidgetRef ref,
-    PrayerName name,
-    Prayer record,
-  ) async {
-    final messenger = ScaffoldMessenger.of(context);
-    final colorScheme = Theme.of(context).colorScheme;
-
-    final paid = await ref
-        .read(ledgerProvider.notifier)
-        .payQadhaFor(record.date, name);
-    if (!context.mounted || paid == null) return;
-
-    messenger.showSnackBar(
-      AppSnackBar.success(
-        colorScheme,
-        'Qadha ${name.displayName} tercatat lunas.',
-      ),
-    );
-  }
-
-  String _statusLabel(PrayerStatus status) {
-    switch (status) {
-      case PrayerStatus.onTime:
-        return 'Tepat Waktu';
-      case PrayerStatus.late:
-        return 'Qadha / Terlambat';
-      case PrayerStatus.missed:
-        return 'Terlewat';
-    }
-  }
 }

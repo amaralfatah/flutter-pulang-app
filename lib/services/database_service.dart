@@ -16,7 +16,7 @@ class DatabaseService {
 
   static Database? _database;
   static const String _databaseName = 'pulang.db';
-  static const int databaseVersion = 2;
+  static const int databaseVersion = 3;
 
   /// Penanda yang dipakai versi lama saat menandai solat terlewat secara
   /// otomatis. Baris seperti ini bukan keterangan user, jadi migrasi v2
@@ -66,6 +66,26 @@ class DatabaseService {
         whereArgs: [PrayerStatus.missed.value, _legacyAutoMissedNote],
       );
     }
+
+    // v2 -> v3: qadha tidak lagi punya status sendiri.
+    //
+    // Dulu solat yang diqadha tetap berstatus `missed` dengan penanda terpisah
+    // `qadha_paid_at` — dua konsep untuk satu hal yang sama, dan user harus
+    // paham bedanya. Sekarang mengqadha cukup memindahkan statusnya ke `late`,
+    // sama seperti solat yang memang dikerjakan di luar waktu.
+    //
+    // Kolomnya sendiri dibiarkan menganggur: SQLite baru bisa DROP COLUMN sejak
+    // 3.35, dan versi bawaan perangkat lama belum tentu setinggi itu. Kolom
+    // tak terpakai tidak berbiaya — membangun ulang tabel demi membuangnya
+    // justru berisiko kehilangan data.
+    if (oldVersion < 3) {
+      await db.update(
+        'prayers',
+        {'status': PrayerStatus.late.value},
+        where: 'status = ? AND qadha_paid_at IS NOT NULL',
+        whereArgs: [PrayerStatus.missed.value],
+      );
+    }
   }
 
   /// Create database tables
@@ -79,8 +99,7 @@ class DatabaseService {
         date TEXT NOT NULL,
         status TEXT NOT NULL,
         time TEXT,
-        notes TEXT,
-        qadha_paid_at TEXT
+        notes TEXT
       )
     ''');
 
@@ -155,11 +174,6 @@ class DatabaseService {
   }
 
   /// Insert or update prayer (upsert)
-  ///
-  /// Tanda lunas qadha ikut dipertahankan kecuali pemanggil memang membawa
-  /// nilai baru. Tanpa ini, mengedit status dari Kalender akan menghapus bukti
-  /// pembayaran yang sudah tercatat dan menghidupkan lagi hutang yang sudah
-  /// dibayar.
   Future<int> upsertPrayer(Prayer prayer) async {
     final existing = await getPrayerByDateAndName(
       prayer.date,
@@ -167,31 +181,29 @@ class DatabaseService {
     );
     if (existing == null) return await insertPrayer(prayer);
 
-    return await updatePrayer(
-      prayer.copyWith(
-        id: existing.id,
-        qadhaPaidAt: prayer.qadhaPaidAt ?? existing.qadhaPaidAt,
-      ),
-    );
+    return await updatePrayer(prayer.copyWith(id: existing.id));
   }
 
-  /// Lunasi hutang qadha pada tanggal dan waktu solat tertentu — dipakai saat
-  /// user mengqadha lewat Kalender, di mana sasarannya dipilih langsung dan
-  /// bukan "yang tertua". Mengembalikan baris yang tersentuh, null kalau di
-  /// sana memang tidak ada hutang.
+  /// Qadha sebuah solat yang terlewat: statusnya pindah dari `missed` ke
+  /// `late`. Mengembalikan baris sebelum diubah — bekal untuk membatalkannya —
+  /// atau null kalau di tanggal itu memang tidak ada hutang.
   Future<Prayer?> payQadhaFor(String date, PrayerName name) async {
     final existing = await getPrayerByDateAndName(date, name);
-    if (existing == null || !existing.isOutstandingQadha) return null;
+    if (existing == null || existing.status != PrayerStatus.missed) return null;
 
+    await updatePrayer(existing.copyWith(status: PrayerStatus.late));
+    return existing;
+  }
+
+  /// Kembalikan sebuah qadha jadi hutang lagi — kebalikan [payQadhaFor].
+  Future<void> markMissedAgain(int id) async {
     final db = await database;
-    final paidAt = DateTime.now().toIso8601String();
     await db.update(
       'prayers',
-      {'qadha_paid_at': paidAt},
+      {'status': PrayerStatus.missed.value},
       where: 'id = ?',
-      whereArgs: [existing.id],
+      whereArgs: [id],
     );
-    return existing.copyWith(qadhaPaidAt: paidAt);
   }
 
   /// Hutang qadha yang belum dibayar, dikelompokkan per tanggal dan urut dari
@@ -203,7 +215,7 @@ class DatabaseService {
     final db = await database;
     final maps = await db.query(
       'prayers',
-      where: 'status = ? AND qadha_paid_at IS NULL',
+      where: 'status = ?',
       whereArgs: [PrayerStatus.missed.value],
       orderBy: 'date ASC',
     );
@@ -271,14 +283,14 @@ class DatabaseService {
 
   // ============ STATISTICS QUERIES ============
 
-  /// Hari-hari yang kelima waktunya sudah terpenuhi, urut menaik. Qadha yang
-  /// sudah dibayar ikut dihitung terpenuhi — hutangnya memang sudah lunas.
+  /// Hari-hari yang kelima waktunya sudah terpenuhi, urut menaik. Solat yang
+  /// diqadha berstatus `late`, jadi ia ikut terhitung di sini.
   Future<List<DateTime>> _getCompleteDays() async {
     final db = await database;
     final rows = await db.rawQuery('''
       SELECT date, COUNT(*) as count
       FROM prayers
-      WHERE status IN ('on_time', 'late') OR qadha_paid_at IS NOT NULL
+      WHERE status IN ('on_time', 'late')
       GROUP BY date
       HAVING count >= 5
       ORDER BY date ASC
@@ -401,10 +413,9 @@ class DatabaseService {
     // sudah jadi hutang saat itu juga, tidak perlu menunggu hari berganti.
     final statusRows = await db.rawQuery(
       '''
-      SELECT prayer_name, status, qadha_paid_at IS NOT NULL AS paid,
-             COUNT(*) as count
+      SELECT prayer_name, status, COUNT(*) as count
       FROM prayers
-      GROUP BY prayer_name, status, paid
+      GROUP BY prayer_name, status
     ''',
     );
 
@@ -430,7 +441,7 @@ class DatabaseService {
 
     final perPrayer = <PrayerName, PrayerTally>{};
     for (final name in PrayerName.values) {
-      var onTime = 0, late = 0, outstanding = 0, qadhaPaid = 0;
+      var onTime = 0, late = 0, outstanding = 0;
 
       for (final row in statusRows) {
         if (PrayerNameExtension.fromString(row['prayer_name'] as String) !=
@@ -441,7 +452,6 @@ class DatabaseService {
         final status = PrayerStatusExtension.fromString(
           row['status'] as String,
         );
-        final isPaid = (row['paid'] as int) == 1;
 
         switch (status) {
           case PrayerStatus.onTime:
@@ -449,11 +459,7 @@ class DatabaseService {
           case PrayerStatus.late:
             late += count;
           case PrayerStatus.missed:
-            if (isPaid) {
-              qadhaPaid += count;
-            } else {
-              outstanding += count;
-            }
+            outstanding += count;
         }
       }
 
@@ -466,7 +472,6 @@ class DatabaseService {
         onTime: onTime,
         late: late,
         outstanding: outstanding,
-        qadhaPaid: qadhaPaid,
         unrecorded: unrecorded,
       );
     }
@@ -515,90 +520,6 @@ class DatabaseService {
       cursor = cursor.subtract(const Duration(days: 1));
     }
     return result;
-  }
-
-  /// Hutang qadha yang belum dibayar untuk satu waktu solat, tertua dulu.
-  /// Qadha dilunasi dari yang paling lama supaya urutannya wajar.
-  Future<List<Prayer>> getOutstandingQadha(
-    PrayerName name, {
-    int limit = 100,
-  }) async {
-    final db = await database;
-    final maps = await db.query(
-      'prayers',
-      where: 'prayer_name = ? AND status = ? AND qadha_paid_at IS NULL',
-      whereArgs: [name.value, PrayerStatus.missed.value],
-      orderBy: 'date ASC',
-      limit: limit,
-    );
-    return maps.map(Prayer.fromMap).toList();
-  }
-
-  /// Hutang qadha tertua untuk satu waktu solat.
-  Future<Prayer?> getOldestOutstandingQadha(PrayerName name) async {
-    final oldest = await getOutstandingQadha(name, limit: 1);
-    return oldest.isEmpty ? null : oldest.first;
-  }
-
-  /// Lunasi [count] hutang qadha tertua untuk [name] sekaligus, lalu kembalikan
-  /// baris-baris yang tersentuh supaya UI bisa menyebut tanggalnya dengan pasti.
-  ///
-  /// Melunasi beberapa qadha dalam sekali duduk itu perilaku yang wajar, jadi
-  /// operasinya dibuat borongan: satu keputusan, satu transaksi. Menyicilnya
-  /// jadi banyak panggilan tunggal hanya memaksa user menekan konfirmasi
-  /// berulang kali, dan itu justru melatih orang berhenti membacanya.
-  ///
-  /// Waktu pelunasan disimpan lengkap dengan jam (ISO-8601), bukan cuma
-  /// tanggal, supaya beberapa pembayaran di hari yang sama tetap bisa
-  /// diurutkan — itu syarat agar pembatalan mengenai baris yang benar.
-  Future<List<Prayer>> payQadha(PrayerName name, {int count = 1}) async {
-    if (count < 1) return const [];
-
-    final targets = await getOutstandingQadha(name, limit: count);
-    if (targets.isEmpty) return const [];
-
-    final db = await database;
-    final paidAt = DateTime.now().toIso8601String();
-    final ids = targets.map((p) => p.id).toList();
-    final placeholders = List.filled(ids.length, '?').join(',');
-
-    await db.update(
-      'prayers',
-      {'qadha_paid_at': paidAt},
-      where: 'id IN ($placeholders)',
-      whereArgs: ids,
-    );
-    return targets.map((p) => p.copyWith(qadhaPaidAt: paidAt)).toList();
-  }
-
-  /// Qadha yang paling belakangan dilunasi, terbaru dulu. Dipakai layar Qadha
-  /// untuk memperlihatkan jejak pembayaran — tanpa ini, salah tekan jadi tidak
-  /// terlacak begitu snackbar-nya lewat.
-  Future<List<Prayer>> getRecentlyPaidQadha({int limit = 10}) async {
-    final db = await database;
-    final maps = await db.query(
-      'prayers',
-      where: 'status = ? AND qadha_paid_at IS NOT NULL',
-      whereArgs: [PrayerStatus.missed.value],
-      // id DESC memutus seri: dua pelunasan dalam milidetik yang sama
-      // dapat timestamp identik, dan urutan SQLite untuk seri tidak terdefinisi.
-      orderBy: 'qadha_paid_at DESC, id DESC',
-      limit: limit,
-    );
-    return maps.map(Prayer.fromMap).toList();
-  }
-
-  /// Kembalikan satu baris qadha jadi hutang lagi. Dipakai untuk membatalkan
-  /// pembayaran tertentu, bukan sekadar "yang terakhir".
-  Future<bool> undoPayQadhaById(int id) async {
-    final db = await database;
-    final updated = await db.update(
-      'prayers',
-      {'qadha_paid_at': null},
-      where: 'id = ?',
-      whereArgs: [id],
-    );
-    return updated > 0;
   }
 
   /// Isi seluruh slot kosong pada satu hari dengan status yang dipilih user.

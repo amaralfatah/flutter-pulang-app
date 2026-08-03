@@ -15,11 +15,21 @@ import '../../widgets/shared/prayer_card.dart';
 /// Tampilan kalender kehadiran solat. Setiap segmen pada cincin mewakili satu
 /// waktu solat. Dipakai sebagai salah satu segmen di layar Riwayat, jadi ia
 /// tidak membawa Scaffold maupun AppBar sendiri.
-class CalendarView extends ConsumerWidget {
+class CalendarView extends ConsumerStatefulWidget {
   const CalendarView({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<CalendarView> createState() => _CalendarViewState();
+}
+
+class _CalendarViewState extends ConsumerState<CalendarView> {
+  /// Mulai dari mode minggu: grid sebulan penuh setinggi ~350px selalu
+  /// mendorong daftar solat hari terpilih ke bawah lipatan, padahal daftar
+  /// itulah yang ditap. Grid tetap sekali ketuk lewat handle di bawah.
+  CalendarFormat _format = CalendarFormat.week;
+
+  @override
+  Widget build(BuildContext context) {
     final state = ref.watch(calendarProvider);
 
     return ListView(
@@ -43,133 +53,201 @@ class CalendarView extends ConsumerWidget {
   ) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TableCalendar(
+            firstDay: DateTime.utc(2020, 1, 1),
+            lastDay: DateTime.utc(2030, 12, 31),
+            focusedDay: state.focusedDay,
+            selectedDayPredicate: (day) => isSameDay(state.selectedDay, day),
+            onDaySelected: (selectedDay, focusedDay) {
+              ref.read(calendarProvider.notifier).selectDay(selectedDay);
+            },
+            onPageChanged: (focusedDay) {
+              ref.read(calendarProvider.notifier).onPageChanged(focusedDay);
+            },
+            calendarFormat: _format,
+            availableCalendarFormats: const {
+              CalendarFormat.week: 'Minggu',
+              CalendarFormat.month: 'Bulan',
+            },
+            // Hanya swipe horizontal (ganti bulan/minggu). Swipe vertikal
+            // dibiarkan lewat ke ListView halaman supaya scroll ke bawah tetap
+            // enak — makanya buka/tutup lewat handle, bukan gestur.
+            availableGestures: AvailableGestures.horizontalSwipe,
+            startingDayOfWeek: StartingDayOfWeek.monday,
+            locale: 'id_ID',
+            rowHeight: 52,
+            daysOfWeekHeight: 40,
+
+            // Header style
+            headerStyle: HeaderStyle(
+              // Pemicu buka/tutup ditaruh sebagai handle di bawah grid, bukan di
+              // header: tombol di sini akan mendesak judul bulan keluar dari
+              // tengah dan merusak simetri chevron–judul–chevron.
+              formatButtonVisible: false,
+              titleCentered: true,
+              headerPadding: const EdgeInsets.symmetric(vertical: 12),
+              titleTextStyle: Theme.of(context).textTheme.titleMedium!.copyWith(
+                fontWeight: FontWeight.bold,
+                color: Theme.of(
+                  context,
+                ).colorScheme.primary, // Header title usually primary
+              ),
+              leftChevronIcon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.chevron_left_rounded,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: 20,
+                ),
+              ),
+              rightChevronIcon: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.primaryContainer,
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  Icons.chevron_right_rounded,
+                  color: Theme.of(context).colorScheme.primary,
+                  size: 20,
+                ),
+              ),
+            ),
+
+            // Days of week style
+            daysOfWeekStyle: DaysOfWeekStyle(
+              weekdayStyle: Theme.of(context).textTheme.bodySmall!.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+              weekendStyle: Theme.of(context).textTheme.bodySmall!.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+
+            // Calendar style - handled by custom builders
+            calendarStyle: CalendarStyle(
+              outsideDaysVisible: false,
+              cellMargin: const EdgeInsets.all(2),
+              defaultDecoration: const BoxDecoration(shape: BoxShape.circle),
+              weekendDecoration: const BoxDecoration(shape: BoxShape.circle),
+              todayDecoration: const BoxDecoration(shape: BoxShape.circle),
+              selectedDecoration: const BoxDecoration(shape: BoxShape.circle),
+              defaultTextStyle: Theme.of(context).textTheme.bodyMedium!
+                  .copyWith(color: Theme.of(context).colorScheme.onSurface),
+              weekendTextStyle: Theme.of(context).textTheme.bodyMedium!
+                  .copyWith(color: Theme.of(context).colorScheme.onSurface),
+              todayTextStyle: Theme.of(context).textTheme.bodyMedium!.copyWith(
+                color: Theme.of(context).colorScheme.primary,
+                fontWeight: FontWeight.bold,
+              ),
+              selectedTextStyle: Theme.of(context).textTheme.bodyMedium!
+                  .copyWith(
+                    color: Theme.of(context).colorScheme.onPrimary,
+                    fontWeight: FontWeight.bold,
+                  ),
+            ),
+
+            // Custom builders for segmented progress ring
+            calendarBuilders: CalendarBuilders(
+              defaultBuilder: (context, date, focusedDay) {
+                final dayStatus = state.getPrayerStatus(date);
+                return _buildDayCell(
+                  context,
+                  date,
+                  dayStatus,
+                  isToday: false,
+                  isSelected: false,
+                );
+              },
+              todayBuilder: (context, date, focusedDay) {
+                final dayStatus = state.getPrayerStatus(date);
+                return _buildDayCell(
+                  context,
+                  date,
+                  dayStatus,
+                  isToday: true,
+                  isSelected: false,
+                );
+              },
+              selectedBuilder: (context, date, focusedDay) {
+                final dayStatus = state.getPrayerStatus(date);
+                return _buildDayCell(
+                  context,
+                  date,
+                  dayStatus,
+                  isToday: false,
+                  isSelected: true,
+                );
+              },
+            ),
+          ),
+          _buildFormatHandle(context),
+        ],
+      ),
+    );
+  }
+
+  void _setFormat(CalendarFormat format) {
+    if (_format == format) return;
+    setState(() => _format = format);
+  }
+
+  /// Handle buka/tutup grid: ketuk, atau seret naik/turun.
+  ///
+  /// Gestur vertikal sengaja diklaim hanya oleh strip setinggi 32px ini, bukan
+  /// oleh `availableGestures` pada kalender. Kalau seluruh grid yang menangkap
+  /// drag vertikal, di mode bulan ia menutupi hampir seluruh layar dan tidak
+  /// menyisakan permukaan untuk menggulir ke daftar solat di bawahnya.
+  Widget _buildFormatHandle(BuildContext context) {
+    final isMonth = _format == CalendarFormat.month;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onVerticalDragEnd: (details) {
+        final velocity = details.primaryVelocity ?? 0;
+        if (velocity < 0) {
+          _setFormat(CalendarFormat.week);
+        } else if (velocity > 0) {
+          _setFormat(CalendarFormat.month);
+        }
+      },
       child: Padding(
-        padding: const EdgeInsets.only(bottom: 16),
-        child: TableCalendar(
-          firstDay: DateTime.utc(2020, 1, 1),
-          lastDay: DateTime.utc(2030, 12, 31),
-          focusedDay: state.focusedDay,
-          selectedDayPredicate: (day) => isSameDay(state.selectedDay, day),
-          onDaySelected: (selectedDay, focusedDay) {
-            ref.read(calendarProvider.notifier).selectDay(selectedDay);
-          },
-          onPageChanged: (focusedDay) {
-            ref.read(calendarProvider.notifier).onPageChanged(focusedDay);
-          },
-          calendarFormat: CalendarFormat.month,
-          // Hanya swipe horizontal (ganti bulan). Swipe vertikal dibiarkan
-          // lewat ke ListView halaman supaya scroll ke bawah tetap enak.
-          availableGestures: AvailableGestures.horizontalSwipe,
-          startingDayOfWeek: StartingDayOfWeek.monday,
-          locale: 'id_ID',
-          rowHeight: 52,
-          daysOfWeekHeight: 40,
-
-          // Header style
-          headerStyle: HeaderStyle(
-            formatButtonVisible: false,
-            titleCentered: true,
-            headerPadding: const EdgeInsets.symmetric(vertical: 12),
-            titleTextStyle: Theme.of(context).textTheme.titleMedium!.copyWith(
-              fontWeight: FontWeight.bold,
-              color: Theme.of(
-                context,
-              ).colorScheme.primary, // Header title usually primary
-            ),
-            leftChevronIcon: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                shape: BoxShape.circle,
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Center(
+          child: Semantics(
+            button: true,
+            label: isMonth
+                ? 'Kuncupkan ke tampilan minggu'
+                : 'Perluas ke tampilan bulan',
+            // Target ketuk dibatasi 64px di tengah: InkWell selebar Card akan
+            // memercikkan ripple melewati sudut membulatnya.
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () => _setFormat(
+                isMonth ? CalendarFormat.week : CalendarFormat.month,
               ),
-              child: Icon(
-                Icons.chevron_left_rounded,
-                color: Theme.of(context).colorScheme.primary,
-                size: 20,
+              child: SizedBox(
+                width: 64,
+                height: 32,
+                child: AnimatedRotation(
+                  turns: isMonth ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 22,
+                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  ),
+                ),
               ),
             ),
-            rightChevronIcon: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.primaryContainer,
-                shape: BoxShape.circle,
-              ),
-              child: Icon(
-                Icons.chevron_right_rounded,
-                color: Theme.of(context).colorScheme.primary,
-                size: 20,
-              ),
-            ),
-          ),
-
-          // Days of week style
-          daysOfWeekStyle: DaysOfWeekStyle(
-            weekdayStyle: Theme.of(context).textTheme.bodySmall!.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w600,
-            ),
-            weekendStyle: Theme.of(context).textTheme.bodySmall!.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-
-          // Calendar style - handled by custom builders
-          calendarStyle: CalendarStyle(
-            outsideDaysVisible: false,
-            cellMargin: const EdgeInsets.all(2),
-            defaultDecoration: const BoxDecoration(shape: BoxShape.circle),
-            weekendDecoration: const BoxDecoration(shape: BoxShape.circle),
-            todayDecoration: const BoxDecoration(shape: BoxShape.circle),
-            selectedDecoration: const BoxDecoration(shape: BoxShape.circle),
-            defaultTextStyle: Theme.of(context).textTheme.bodyMedium!.copyWith(
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-            weekendTextStyle: Theme.of(context).textTheme.bodyMedium!.copyWith(
-              color: Theme.of(context).colorScheme.onSurface,
-            ),
-            todayTextStyle: Theme.of(context).textTheme.bodyMedium!.copyWith(
-              color: Theme.of(context).colorScheme.primary,
-              fontWeight: FontWeight.bold,
-            ),
-            selectedTextStyle: Theme.of(context).textTheme.bodyMedium!.copyWith(
-              color: Theme.of(context).colorScheme.onPrimary,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-
-          // Custom builders for segmented progress ring
-          calendarBuilders: CalendarBuilders(
-            defaultBuilder: (context, date, focusedDay) {
-              final dayStatus = state.getPrayerStatus(date);
-              return _buildDayCell(
-                context,
-                date,
-                dayStatus,
-                isToday: false,
-                isSelected: false,
-              );
-            },
-            todayBuilder: (context, date, focusedDay) {
-              final dayStatus = state.getPrayerStatus(date);
-              return _buildDayCell(
-                context,
-                date,
-                dayStatus,
-                isToday: true,
-                isSelected: false,
-              );
-            },
-            selectedBuilder: (context, date, focusedDay) {
-              final dayStatus = state.getPrayerStatus(date);
-              return _buildDayCell(
-                context,
-                date,
-                dayStatus,
-                isToday: false,
-                isSelected: true,
-              );
-            },
           ),
         ),
       ),
@@ -242,8 +320,9 @@ class CalendarView extends ConsumerWidget {
         child: Stack(
           alignment: Alignment.center,
           children: [
-            // Progress ring (5 segments) - tetap tampil walau hari terpilih,
-            // ring (40px) berada di luar lingkaran isian terpilih (36px).
+            // Progress ring (5 segments) - tetap tampil walau hari terpilih.
+            // Ring 40px dengan stroke 2.5 berakhir di radius 17.5, sedangkan
+            // lingkaran isian 30px berhenti di radius 15 -> ada jarak 2.5px.
             if (hasAnyStatus)
               SizedBox(
                 width: 40,
@@ -264,8 +343,8 @@ class CalendarView extends ConsumerWidget {
 
             // Background circle for today/selected
             Container(
-              width: 36,
-              height: 36,
+              width: 30,
+              height: 30,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: isSelected
@@ -308,13 +387,14 @@ class CalendarView extends ConsumerWidget {
     final prayers = state.selectedDayPrayers;
     // Count all recorded prayers (onTime, late, or missed)
     final totalRecordedCount = prayers.length;
-    // Count only completed prayers (onTime or late) for progress color
-    final completedCount = prayers
-        .where(
-          (p) =>
-              p.status == PrayerStatus.onTime || p.status == PrayerStatus.late,
-        )
-        .length;
+    // Count only completed prayers for progress color — qadha yang sudah
+    // dilunasi ikut terhitung tertunaikan, sama seperti di streak.
+    final completedCount = prayers.where((p) => p.isFulfilled).length;
+    final today = DateTime.now();
+    final isPastDay = selectedDay.isBefore(
+      DateTime(today.year, today.month, today.day),
+    );
+    final missing = 5 - totalRecordedCount;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -349,11 +429,162 @@ class CalendarView extends ConsumerWidget {
             padding: EdgeInsets.all(32),
             child: Center(child: CircularProgressIndicator()),
           )
-        else
+        else ...[
+          // Hanya untuk hari lampau: hari ini dan masa depan wajar belum
+          // lengkap, jadi tidak perlu ajakan konfirmasi.
+          if (isPastDay && missing > 0)
+            _buildIncompleteBanner(context, ref, selectedDay, missing),
           _buildPrayerList(context, ref, prayers, selectedDay),
+        ],
       ],
     );
   }
+
+  /// Ajakan melengkapi hari lampau yang belum tercatat penuh — sengaja
+  /// ditempel pada hari yang bersangkutan, bukan didaftar terpisah, supaya
+  /// tanggalnya tidak pernah ambigu. Menandai "terlewat" di sini menambah
+  /// hutang qadha, jadi konsekuensinya dieja dulu lewat dialog konfirmasi.
+  Widget _buildIncompleteBanner(
+    BuildContext context,
+    WidgetRef ref,
+    DateTime selectedDay,
+    int missing,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Card(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 12),
+      color: colorScheme.surfaceContainerHighest,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '$missing waktu belum tercatat',
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Aplikasi tidak menebak — beri tahu apa yang terjadi, atau isi satu-satu lewat daftar di bawah.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _confirmIncompleteDay(
+                      context,
+                      ref,
+                      selectedDay,
+                      missing,
+                      PrayerStatus.late,
+                    ),
+                    icon: const Icon(Icons.check_rounded, size: 18),
+                    label: const Text('Solat'),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _confirmIncompleteDay(
+                      context,
+                      ref,
+                      selectedDay,
+                      missing,
+                      PrayerStatus.missed,
+                    ),
+                    icon: const Icon(Icons.close_rounded, size: 18),
+                    label: const Text('Terlewat'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: colorScheme.error,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Satu ketukan di sini mengubah beberapa slot sekaligus, jadi tanggal dan
+  /// akibatnya dieja dulu. Menandai terlewat menambah hutang qadha — itu bukan
+  /// hal yang pantas terjadi karena jempol yang meleset.
+  Future<void> _confirmIncompleteDay(
+    BuildContext context,
+    WidgetRef ref,
+    DateTime selectedDay,
+    int missing,
+    PrayerStatus status,
+  ) async {
+    final colorScheme = Theme.of(context).colorScheme;
+    final messenger = ScaffoldMessenger.of(context);
+    final notifier = ref.read(ledgerProvider.notifier);
+    final isMissed = status == PrayerStatus.missed;
+    final formatted = DateFormat(
+      'EEEE, d MMMM yyyy',
+      'id_ID',
+    ).format(selectedDay);
+    final dateStr = _formatDateKey(selectedDay);
+
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: Text(isMissed ? 'Tandai Terlewat?' : 'Tandai Sudah Solat?'),
+        content: Text(
+          isMissed
+              ? '$missing waktu pada $formatted akan dicatat terlewat dan '
+                    'menambah hutang qadha sebanyak $missing.'
+              : '$missing waktu pada $formatted akan dicatat sudah dikerjakan.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            style: isMissed
+                ? FilledButton.styleFrom(
+                    backgroundColor: colorScheme.error,
+                    foregroundColor: colorScheme.onError,
+                  )
+                : null,
+            child: Text(isMissed ? 'Ya, terlewat' : 'Ya, sudah'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+
+    final ids = await notifier.confirmDay(dateStr, status);
+    if (ids.isEmpty) return;
+
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(
+          isMissed
+              ? '$formatted dicatat terlewat.'
+              : '$formatted dicatat sudah dikerjakan.',
+        ),
+        // Lihat catatan di home_screen: tanpa ini snackbar tidak hilang sendiri.
+        persist: false,
+        action: SnackBarAction(
+          label: 'Urungkan',
+          onPressed: () => notifier.undoConfirmDay(ids),
+        ),
+      ),
+    );
+  }
+
+  static String _formatDateKey(DateTime date) =>
+      '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
 
   Widget _buildStatusBadge(
     BuildContext context, {
@@ -420,11 +651,10 @@ class CalendarView extends ConsumerWidget {
         final prayer = prayers
             .where((p) => p.prayerName == prayerName)
             .firstOrNull;
-        final status = prayer?.status;
 
         return PrayerCard(
           prayerName: prayerName,
-          status: status,
+          status: prayer?.status,
           onTap: () =>
               _handlePrayerTap(context, ref, prayerName, prayer, selectedDay),
         );
@@ -451,22 +681,6 @@ class CalendarView extends ConsumerWidget {
       prayerName: prayerName,
       currentStatus: existingPrayer?.status,
       subtitle: formattedDate,
-      isOutstandingQadha: existingPrayer?.isOutstandingQadha ?? false,
-      onQadhaPaid: existingPrayer == null
-          ? null
-          : () async {
-              final paid = await ref
-                  .read(calendarProvider.notifier)
-                  .payQadhaForDate(date: selectedDay, prayerName: prayerName);
-              if (!paid) return;
-
-              messenger.showSnackBar(
-                AppSnackBar.success(
-                  colorScheme,
-                  'Qadha ${prayerName.displayName} $formattedDate tercatat lunas.',
-                ),
-              );
-            },
       onDelete: existingPrayer?.id == null
           ? null
           : () async {
