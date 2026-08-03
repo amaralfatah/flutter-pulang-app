@@ -49,17 +49,11 @@ class _QadhaScreenState extends ConsumerState<QadhaScreen> {
             else if (!state.hasData)
               const _EmptyState()
             else ...[
-              _TotalCard(ledger: state.ledger),
-              const SizedBox(height: 24),
               if (state.outstandingByDate.isEmpty)
                 const _NoDebtCard()
               else ...[
-                const _SectionHeader(
-                  title: 'Hutang per Tanggal',
-                  subtitle:
-                      'Ketuk waktu solat yang sudah kamu qadha. Tanggalnya '
-                      'terlihat jelas, dan bisa dibatalkan kapan saja.',
-                ),
+                _TotalCard(ledger: state.ledger),
+                const SizedBox(height: 16),
                 // Key per tanggal: tanpa ini Flutter bisa memakai ulang state
                 // sebuah kartu untuk tanggal lain saat daftar menyusut, dan
                 // id yang sedang diproses (_paying) berpindah ke hari yang salah.
@@ -80,6 +74,9 @@ class _QadhaScreenState extends ConsumerState<QadhaScreen> {
 }
 
 /// Ringkasan hutang keseluruhan.
+///
+/// Kartu tonal M3 biasa: warna container dari skema, tipografi langsung dari
+/// text theme, tanpa berat huruf atau letter-spacing khusus.
 class _TotalCard extends StatelessWidget {
   const _TotalCard({required this.ledger});
 
@@ -87,18 +84,8 @@ class _TotalCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
-    final overall = ledger.overall;
-    final outstanding = overall.outstanding;
-    final isClear = outstanding == 0;
-
-    final container = isClear
-        ? colorScheme.statusOnTimeContainer
-        : colorScheme.statusMissedContainer;
-    final onContainer = isClear
-        ? colorScheme.onStatusOnTimeContainer
-        : colorScheme.onStatusMissedContainer;
-
     final since = DateFormat(
       'd MMMM yyyy',
       'id_ID',
@@ -106,61 +93,44 @@ class _TotalCard extends StatelessWidget {
 
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16),
-      color: container,
+      color: colorScheme.statusMissedContainer,
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              children: [
-                Icon(
-                  isClear
-                      ? Icons.verified_rounded
-                      : Icons.account_balance_wallet_rounded,
-                  color: onContainer,
-                  size: 28,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    isClear ? 'Tidak ada hutang' : 'Hutang Solat',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: onContainer,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ],
+            Text(
+              'Belum diqadha',
+              style: textTheme.titleMedium?.copyWith(
+                color: colorScheme.onStatusMissedContainer,
+              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 8),
             Row(
               crossAxisAlignment: CrossAxisAlignment.baseline,
               textBaseline: TextBaseline.alphabetic,
               children: [
                 Text(
-                  '$outstanding',
-                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                    color: onContainer,
-                    fontWeight: FontWeight.bold,
-                    height: 1,
+                  '${ledger.overall.outstanding}',
+                  style: textTheme.displaySmall?.copyWith(
+                    color: colorScheme.onStatusMissedContainer,
                   ),
                 ),
-                const SizedBox(width: 6),
+                const SizedBox(width: 8),
                 Text(
                   'solat',
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleSmall?.copyWith(color: onContainer),
+                  style: textTheme.titleMedium?.copyWith(
+                    color: colorScheme.onStatusMissedContainer,
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Text(
-              'Dihitung sejak catatan pertamamu, $since.',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: onContainer),
+              'Tercatat sejak $since',
+              style: textTheme.bodyMedium?.copyWith(
+                color: colorScheme.onStatusMissedContainer,
+              ),
             ),
           ],
         ),
@@ -193,58 +163,38 @@ class _QadhaDayCardState extends ConsumerState<_QadhaDayCard> {
 
   @override
   Widget build(BuildContext context) {
-    final parsed = DateTime.parse(_day.date);
-    final weekday = DateFormat('EEEE', 'id_ID').format(parsed);
-    final formatted = DateFormat('d MMMM yyyy', 'id_ID').format(parsed);
+    // Satu baris judul: "Sen, 12 Januari 2026". Hari dan tanggal dibaca
+    // sekaligus, dan jumlah hutangnya sudah terlihat dari jumlah chip —
+    // tidak perlu badge angka yang mengulanginya.
+    final title = DateFormat(
+      'EEE, d MMMM yyyy',
+      'id_ID',
+    ).format(DateTime.parse(_day.date));
     final colorScheme = Theme.of(context).colorScheme;
 
     return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Padding(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
                 Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        formatted,
-                        style: Theme.of(context).textTheme.titleMedium
-                            ?.copyWith(fontWeight: FontWeight.bold),
-                      ),
-                      Text(
-                        weekday,
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 10,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colorScheme.statusMissedContainer,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
                   child: Text(
-                    '${_day.prayers.length} hutang',
-                    style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                      color: colorScheme.onStatusMissedContainer,
-                      fontWeight: FontWeight.w600,
-                    ),
+                    title,
+                    style: Theme.of(context).textTheme.titleMedium,
                   ),
                 ),
+                if (_day.prayers.length > 1)
+                  TextButton(
+                    onPressed: _paying.isEmpty ? _payAll : null,
+                    child: const Text('Lunas semua'),
+                  ),
               ],
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 8),
             Wrap(
               spacing: 8,
               runSpacing: 8,
@@ -261,34 +211,29 @@ class _QadhaDayCardState extends ConsumerState<_QadhaDayCard> {
                             color: colorScheme.onSurfaceVariant,
                           ),
                         )
-                      : Icon(
-                          prayerIcon(prayer.prayerName),
-                          size: 18,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
+                      : Icon(prayerIcon(prayer.prayerName), size: 18),
                   label: Text(prayer.prayerName.displayName),
                   onPressed: isPaying ? null : () => _payOne(prayer),
                 );
               }).toList(),
             ),
-            if (_day.prayers.length > 1) ...[
-              const SizedBox(height: 4),
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: _paying.isEmpty ? _payAll : null,
-                  child: const Text('Tandai semua lunas'),
-                ),
-              ),
-            ],
           ],
         ),
       ),
     );
   }
 
-  /// Melunasi satu waktu solat — dipanggil langsung saat chip-nya diketuk.
+  /// Melunasi satu waktu solat — meminta konfirmasi dulu karena tidak boleh
+  /// terjadi hanya karena salah ketuk.
   Future<void> _payOne(Prayer prayer) async {
+    final confirmed = await _confirmPay(
+      title: 'Tandai lunas?',
+      message:
+          '${prayer.prayerName.displayName} ${_shortDate(_day.date)} akan '
+          'ditandai lunas.',
+    );
+    if (!confirmed || !mounted) return;
+
     final id = prayer.id!;
     final date = _day.date;
     setState(() => _paying.add(id));
@@ -302,7 +247,9 @@ class _QadhaDayCardState extends ConsumerState<_QadhaDayCard> {
 
     messenger.showSnackBar(
       SnackBar(
-        content: Text('${prayer.prayerName.displayName} ${_shortDate(date)} lunas.'),
+        content: Text(
+          '${prayer.prayerName.displayName} ${_shortDate(date)} lunas.',
+        ),
         // Lihat catatan di home_screen: tanpa ini snackbar tidak hilang sendiri.
         persist: false,
         action: SnackBarAction(
@@ -315,8 +262,16 @@ class _QadhaDayCardState extends ConsumerState<_QadhaDayCard> {
 
   /// Melunasi seluruh hutang hari ini sekaligus, satu snackbar untuk semua.
   Future<void> _payAll() async {
-    final date = _day.date;
     final prayers = _day.prayers;
+    final confirmed = await _confirmPay(
+      title: 'Tandai semua lunas?',
+      message:
+          '${prayers.length} hutang solat ${_shortDate(_day.date)} akan '
+          'ditandai lunas sekaligus.',
+    );
+    if (!confirmed || !mounted) return;
+
+    final date = _day.date;
     setState(() => _paying.addAll(prayers.map((p) => p.id!)));
     final messenger = ScaffoldMessenger.of(context);
     final notifier = ref.read(ledgerProvider.notifier);
@@ -341,6 +296,31 @@ class _QadhaDayCardState extends ConsumerState<_QadhaDayCard> {
       ),
     );
   }
+
+  /// Dialog konfirmasi sebelum aksi lunas dieksekusi.
+  Future<bool> _confirmPay({
+    required String title,
+    required String message,
+  }) async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(title),
+        content: Text(message),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Batal'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Ya, lunas'),
+          ),
+        ],
+      ),
+    );
+    return result ?? false;
+  }
 }
 
 /// Ditampilkan saat tidak ada hutang tersisa pada tampilan per tanggal.
@@ -351,17 +331,17 @@ class _NoDebtCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(32, 24, 32, 8),
+      padding: const EdgeInsets.fromLTRB(32, 48, 32, 8),
       child: Column(
         children: [
           Icon(
-            Icons.verified_rounded,
+            Icons.check_circle_outline,
             size: 48,
             color: colorScheme.primary,
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 16),
           Text(
-            'Tidak ada hutang tersisa',
+            'Tidak ada hutang solat',
             style: Theme.of(context).textTheme.titleMedium,
             textAlign: TextAlign.center,
           ),
@@ -388,78 +368,17 @@ class _UnconfirmedDaysRow extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final colorScheme = Theme.of(context).colorScheme;
     final count = incompleteDays.length;
 
+    // ListTile di dalam Card: pola baris navigasi standar M3, jadi tidak perlu
+    // menyusun ikon/teks/chevron sendiri.
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16),
-      color: colorScheme.surfaceContainerHighest,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(12),
+      child: ListTile(
+        leading: const Icon(Icons.event_busy_outlined),
+        title: Text('$count hari belum tercatat'),
+        trailing: const Icon(Icons.chevron_right),
         onTap: () => showUnconfirmedDaysPicker(context, ref, incompleteDays),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-          child: Row(
-            children: [
-              Icon(
-                Icons.event_busy_rounded,
-                color: colorScheme.onSurfaceVariant,
-                size: 22,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  count == 1
-                      ? '1 hari belum tercatat'
-                      : '$count hari belum tercatat',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              Icon(
-                Icons.arrow_forward_rounded,
-                color: colorScheme.onSurfaceVariant,
-                size: 20,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _SectionHeader extends StatelessWidget {
-  const _SectionHeader({required this.title, this.subtitle});
-
-  final String title;
-  final String? subtitle;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            title,
-            style: Theme.of(
-              context,
-            ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold),
-          ),
-          if (subtitle != null) ...[
-            const SizedBox(height: 2),
-            Text(
-              subtitle!,
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
-            ),
-          ],
-        ],
       ),
     );
   }
@@ -514,9 +433,9 @@ class _EmptyState extends StatelessWidget {
           Text(
             'Mulai catat solatmu di Home. Hutang qadha dihitung sejak catatan '
             'pertama, dan hanya dari solat yang kamu tandai terlewat.',
-            style: Theme.of(
-              context,
-            ).textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
             textAlign: TextAlign.center,
           ),
         ],

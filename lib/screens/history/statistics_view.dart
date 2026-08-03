@@ -34,52 +34,30 @@ class StatisticsView extends ConsumerWidget {
       physics: const AlwaysScrollableScrollPhysics(),
       padding: const EdgeInsets.only(top: 8, bottom: 32),
       children: [
-        _OverallCard(ledger: ledger),
-        const SizedBox(height: 16),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: [
-              Expanded(
-                child: _StatCard(
-                  title: 'Streak',
-                  value: '${state.currentStreak}',
-                  unit: 'hari',
-                  icon: Icons.local_fire_department_rounded,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: _StatCard(
-                  title: 'Terpanjang',
-                  value: '${state.longestStreak}',
-                  unit: 'hari',
-                  icon: Icons.emoji_events_rounded,
-                ),
-              ),
-            ],
-          ),
+        _OverallCard(
+          ledger: ledger,
+          currentStreak: state.currentStreak,
+          longestStreak: state.longestStreak,
         ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
-          child: Text(
-            'Streak: hari berturut-turut dengan kelima solat terpenuhi — '
-            'tepat waktu, terlambat, atau sudah diqadha.',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
+        const SizedBox(height: 24),
+        const _SectionHeader('Rincian per Waktu'),
+        Card(
+          margin: const EdgeInsets.symmetric(horizontal: 16),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 4),
+            child: Column(
+              children: PrayerName.values
+                  .map(
+                    (name) => _PrayerBreakdownTile(
+                      prayerName: name,
+                      tally: ledger.tallyFor(name),
+                    ),
+                  )
+                  .toList(),
             ),
           ),
         ),
-        const SizedBox(height: 24),
-        if (ledger.weakestPrayer != null)
-          _InsightCard(ledger: ledger),
-        const _SectionHeader('Rincian per Waktu'),
-        ...PrayerName.values.map(
-          (name) => _PrayerBreakdownTile(
-            prayerName: name,
-            tally: ledger.tallyFor(name),
-          ),
-        ),
+        if (ledger.weakestPrayer != null) _InsightNote(ledger: ledger),
         if (state.incompleteDays.isNotEmpty)
           _UnrecordedNote(incompleteDays: state.incompleteDays),
       ],
@@ -87,14 +65,24 @@ class StatisticsView extends ConsumerWidget {
   }
 }
 
-/// Kartu utama: porsi solat yang terpenuhi sepanjang riwayat.
+/// Kartu utama: porsi solat yang terpenuhi sepanjang riwayat, plus streak.
+///
+/// Streak ikut di sini — dulu dua kartu terpisah dengan paragraf penjelas,
+/// padahal isinya cuma dua angka pendek.
 class _OverallCard extends StatelessWidget {
-  const _OverallCard({required this.ledger});
+  const _OverallCard({
+    required this.ledger,
+    required this.currentStreak,
+    required this.longestStreak,
+  });
 
   final PrayerLedger ledger;
+  final int currentStreak;
+  final int longestStreak;
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
     final overall = ledger.overall;
     final percentage = overall.fulfilledRatio * 100;
@@ -106,66 +94,60 @@ class _OverallCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       child: Padding(
-        padding: const EdgeInsets.all(24),
+        padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Sejak $since',
-                      style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '${percentage.toStringAsFixed(1)}%',
-                      style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                  ],
-                ),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primaryContainer,
-                    shape: BoxShape.circle,
-                  ),
-                  child: Icon(
-                    Icons.timeline_rounded,
-                    size: 32,
-                    color: colorScheme.onPrimaryContainer,
-                  ),
-                ),
-              ],
+            Text(
+              'Sejak $since',
+              style: textTheme.labelMedium?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 4),
+            Text(
+              '${percentage.toStringAsFixed(0)}%',
+              style: textTheme.displaySmall?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: colorScheme.primary,
+              ),
+            ),
+            const SizedBox(height: 16),
             ClipRRect(
               borderRadius: BorderRadius.circular(8),
               child: LinearProgressIndicator(
                 value: overall.fulfilledRatio,
-                minHeight: 10,
+                minHeight: 8,
                 backgroundColor: colorScheme.outlineVariant,
                 color: colorScheme.primary,
                 semanticsLabel: 'Konsistensi sepanjang riwayat',
-                semanticsValue: '${percentage.toStringAsFixed(1)} persen',
+                semanticsValue: '${percentage.toStringAsFixed(0)} persen',
               ),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
             Text(
-              '${overall.fulfilled} dari ${overall.known} solat yang tercatat '
-              'sudah dikerjakan, terkumpul dalam ${ledger.closedDays} hari.',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+              '${overall.fulfilled} dari ${overall.known} solat tercatat '
+              'sudah dikerjakan · ${ledger.closedDays} hari',
+              style: textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const Divider(height: 28),
+            Row(
+              children: [
+                Icon(
+                  Icons.local_fire_department_rounded,
+                  size: 18,
+                  color: colorScheme.tertiary,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Streak $currentStreak hari · terpanjang $longestStreak hari',
+                    style: textTheme.bodyMedium,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -174,9 +156,11 @@ class _OverallCard extends StatelessWidget {
   }
 }
 
-/// Satu temuan yang bisa ditindaklanjuti, bukan sekadar angka.
-class _InsightCard extends StatelessWidget {
-  const _InsightCard({required this.ledger});
+/// Satu temuan yang bisa ditindaklanjuti, bukan sekadar angka. Sengaja teks
+/// biasa, bukan kartu berwarna: satu-satunya penekanan di halaman ini adalah
+/// angka besar di atas.
+class _InsightNote extends StatelessWidget {
+  const _InsightNote({required this.ledger});
 
   final PrayerLedger ledger;
 
@@ -186,44 +170,27 @@ class _InsightCard extends StatelessWidget {
     final weakest = ledger.weakestPrayer!;
     final tally = ledger.tallyFor(weakest);
 
-    return Card(
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-      color: colorScheme.secondaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(
-              Icons.lightbulb_rounded,
-              color: colorScheme.onSecondaryContainer,
-              size: 22,
-            ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '${weakest.displayName} paling sering terlewat',
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      color: colorScheme.onSecondaryContainer,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    '${tally.outstanding} kali belum diqadha. Ini titik yang '
-                    'paling berdampak kalau kamu perbaiki lebih dulu.',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSecondaryContainer,
-                    ),
-                  ),
-                ],
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.lightbulb_outline_rounded,
+            size: 18,
+            color: colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '${weakest.displayName} paling sering terlewat — '
+              '${tally.outstanding} kali belum diqadha.',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -238,63 +205,34 @@ class _PrayerBreakdownTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     final colorScheme = Theme.of(context).colorScheme;
 
-    return Card(
-      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(
-                  prayerIcon(prayerName),
-                  color: colorScheme.primary,
-                  size: 22,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    prayerName.displayName,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                Text(
-                  '${(tally.fulfilledRatio * 100).toStringAsFixed(0)}%',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: colorScheme.primary,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Icon(prayerIcon(prayerName), color: colorScheme.primary, size: 20),
+          const SizedBox(width: 12),
+          SizedBox(
+            width: 72,
+            child: Text(
+              prayerName.displayName,
+              style: textTheme.bodyMedium,
+              overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 12),
-            _StatusBar(tally: tally),
-            const SizedBox(height: 10),
-            Text(
-              _summaryLine(tally),
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: colorScheme.onSurfaceVariant),
+          ),
+          Expanded(child: _StatusBar(tally: tally)),
+          const SizedBox(width: 12),
+          Text(
+            '${(tally.fulfilledRatio * 100).toStringAsFixed(0)}%',
+            style: textTheme.labelLarge?.copyWith(
+              color: colorScheme.onSurfaceVariant,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
-  }
-
-  String _summaryLine(PrayerTally tally) {
-    final parts = <String>[
-      '${tally.onTime} tepat waktu',
-      if (tally.late > 0) '${tally.late} qadha/terlambat',
-      if (tally.outstanding > 0) '${tally.outstanding} hutang',
-      if (tally.unrecorded > 0) '${tally.unrecorded} belum tercatat',
-    ];
-    return parts.join(' · ');
   }
 }
 
@@ -329,83 +267,6 @@ class _StatusBar extends StatelessWidget {
                 ),
               )
               .toList(),
-        ),
-      ),
-    );
-  }
-}
-
-class _StatCard extends StatelessWidget {
-  const _StatCard({
-    required this.title,
-    required this.value,
-    required this.unit,
-    required this.icon,
-  });
-
-  final String title;
-  final String value;
-  final String unit;
-  final IconData icon;
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Ikon + label dulu, angka besar di bawahnya: label dapat sisa lebar
-            // penuh sehingga "Terpanjang" tidak pernah terpotong.
-            Row(
-              children: [
-                Icon(icon, color: colorScheme.tertiary, size: 20),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    title,
-                    style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 10),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.baseline,
-              textBaseline: TextBaseline.alphabetic,
-              children: [
-                Flexible(
-                  child: Text(
-                    value,
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                      color: colorScheme.tertiary,
-                      height: 1,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-                const SizedBox(width: 6),
-                Flexible(
-                  child: Text(
-                    unit,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              ],
-            ),
-          ],
         ),
       ),
     );
