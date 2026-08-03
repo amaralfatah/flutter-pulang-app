@@ -4,11 +4,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/providers.dart';
 import '../patterns/pattern_painters.dart';
 
-/// Tinggi konten pada state normal: label (14) + 4 + baris nama (28).
-/// Dipakai sebagai tinggi *minimum* state loading dan error supaya kartu tidak
-/// melompat saat jadwal selesai dimuat — bukan tinggi tetap, karena teks yang
-/// diperbesar lewat Dynamic Type harus tetap muat.
-const double _minContentHeight = 46;
+/// Tinggi konten pada state normal: baris label/jam (20) + 4 + baris
+/// nama/countdown (32). Dipakai sebagai tinggi *minimum* state loading dan
+/// error supaya kartu tidak melompat saat jadwal selesai dimuat — bukan tinggi
+/// tetap, karena teks yang diperbesar lewat Dynamic Type harus tetap muat.
+const double _minContentHeight = 56;
 
 /// Teks sekunder di atas primaryContainer. 0.85 adalah batas bawah yang masih
 /// lolos WCAG AA (4.5:1) di kedua tema — light mode yang menentukan: pada 0.80
@@ -122,6 +122,15 @@ class PrayerTimerCard extends ConsumerWidget {
     // memang perilaku yang diharapkan saat pengguna memperbesar teks.
     final stacked = MediaQuery.textScalerOf(context).scale(100) > 135;
 
+    final time = Text(
+      state.nextPrayerTime ?? '--:--',
+      style: textTheme.bodyMedium?.copyWith(
+        color: onPrimary.withValues(alpha: _secondaryAlpha),
+        letterSpacing: 0.5,
+        fontFeatures: const [FontFeature.tabularFigures()],
+      ),
+    );
+
     if (stacked) {
       return Column(
         mainAxisSize: MainAxisSize.min,
@@ -131,36 +140,53 @@ class PrayerTimerCard extends ConsumerWidget {
           const SizedBox(height: 4),
           _buildPrayerName(context, state.nextPrayerName),
           const SizedBox(height: 4),
+          time,
+          const SizedBox(height: 4),
           _buildCountdown(context, state.remainingTime),
         ],
       );
     }
 
-    // Grid dua baris, dua kolom. Kuncinya CrossAxisAlignment.end: kedua kolom
-    // rata bawah sehingga garis dasar nama solat dan garis dasar countdown
-    // berimpit.
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.end,
+    // Grid 2×2. Dibangun sebagai dua Row bertumpuk, bukan dua Column
+    // berdampingan: dengan dua Column, tinggi baris kiri dan kanan berbeda
+    // (label 14px vs jam 20px) sehingga tidak ada garis yang benar-benar
+    // sejajar. Sebagai Row, tiap baris merapikan dirinya sendiri.
+    //
+    // Perataannya baseline, bukan end. Kedua sisi tiap baris berbeda ukuran
+    // huruf (11 vs 14, lalu 22 vs 24), dan CrossAxisAlignment.end menyamakan
+    // dasar kotak baris — yang descent-nya ikut membesar bersama ukuran huruf,
+    // sehingga garis dasar hurufnya sendiri malah tidak sejajar.
+    return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Expanded(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              label,
-              const SizedBox(height: 4),
-              _buildPrayerName(context, state.nextPrayerName),
-            ],
-          ),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Expanded(child: label),
+            const SizedBox(width: 12),
+            time,
+          ],
         ),
-        const SizedBox(width: 12),
+        const SizedBox(height: 4),
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.baseline,
+          textBaseline: TextBaseline.alphabetic,
+          children: [
+            Expanded(
+              child: _buildPrayerName(context, state.nextPrayerName),
+            ),
+            const SizedBox(width: 12),
 
-        // Sengaja tanpa Flexible. Flexible bawaannya flex 1, sehingga Row
-        // membagi ruang bebas setengah-setengah: kolom kiri dipaksa selebar
-        // separuh kartu lalu terpotong elipsis, sementara kolom kanan hanya
-        // memakai sebagian jatahnya dan menyisakan celah kosong di kanan.
-        // Countdown harus selebar isinya saja, sisanya milik kolom kiri.
-        _buildCountdown(context, state.remainingTime),
+            // Sengaja tanpa Flexible. Flexible bawaannya flex 1, sehingga Row
+            // membagi ruang bebas setengah-setengah: kolom kiri dipaksa
+            // selebar separuh kartu lalu terpotong elipsis, sementara kolom
+            // kanan hanya memakai sebagian jatahnya dan menyisakan celah
+            // kosong di kanan. Countdown harus selebar isinya saja, sisanya
+            // milik kolom kiri.
+            _buildCountdown(context, state.remainingTime),
+          ],
+        ),
       ],
     );
   }

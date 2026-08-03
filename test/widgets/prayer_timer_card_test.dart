@@ -32,6 +32,25 @@ double _contrastRatio(Color foreground, Color background) {
   return (math.max(a, b) + 0.05) / (math.min(a, b) + 0.05);
 }
 
+/// Posisi garis dasar huruf (bukan dasar kotak baris) dalam koordinat layar.
+///
+/// getDistanceToBaseline biasanya hanya boleh dipanggil oleh induk sebuah
+/// RenderBox selama layout; di luar itu ia memicu assert. debugCheckingIntrinsics
+/// adalah jalan resmi untuk mengukurnya dari luar, dan dikembalikan ke semula
+/// lewat try/finally agar tidak membocorkan state ke tes berikutnya.
+double _baselineY(WidgetTester tester, Finder finder) {
+  final box = tester.renderObject<RenderBox>(finder);
+  final wasChecking = RenderObject.debugCheckingIntrinsics;
+  RenderObject.debugCheckingIntrinsics = true;
+  try {
+    final distance = box.getDistanceToBaseline(TextBaseline.alphabetic);
+    expect(distance, isNotNull, reason: 'widget harus punya garis dasar teks');
+    return box.localToGlobal(Offset(0, distance!)).dy;
+  } finally {
+    RenderObject.debugCheckingIntrinsics = wasChecking;
+  }
+}
+
 Color _composite(Color foreground, Color opaqueBackground) {
   final a = foreground.a;
   return Color.from(
@@ -115,6 +134,29 @@ void main() {
         cardRight - countdownRight,
         closeTo(cardMargin + horizontalPadding, 1),
         reason: 'countdown harus menempel ke padding kanan, tanpa celah',
+      );
+
+      // Jam solat berikutnya harus tampil, dan rata kanan pada garis yang sama
+      // dengan countdown — kolom kanan kartu ini adalah satu garis, bukan dua.
+      expect(find.text('17:58'), findsOneWidget);
+      expect(
+        tester.getRect(find.text('17:58')).right,
+        closeTo(countdownRight, 1),
+        reason: 'jam dan countdown harus berbagi garis kanan yang sama',
+      );
+
+      // Kiri dan kanan tiap baris berbeda ukuran huruf, jadi perataan lewat
+      // dasar kotak baris akan menggeser garis dasar hurufnya. Yang diukur di
+      // sini adalah garis dasar sesungguhnya.
+      expect(
+        _baselineY(tester, find.text('SOLAT BERIKUTNYA')),
+        closeTo(_baselineY(tester, find.text('17:58')), 0.5),
+        reason: 'label dan jam harus duduk pada satu garis dasar',
+      );
+      expect(
+        _baselineY(tester, find.text('Maghrib (besok)', findRichText: true)),
+        closeTo(_baselineY(tester, find.text('23j 59m')), 0.5),
+        reason: 'nama solat dan countdown harus duduk pada satu garis dasar',
       );
 
       // Sisi lain dari bug yang sama — nama solat terpotong elipsis — sengaja

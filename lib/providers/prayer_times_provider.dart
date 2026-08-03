@@ -61,6 +61,19 @@ class PrayerTimesNotifier extends Notifier<PrayerTimesState> {
   Timer? _countdownTimer;
   Timer? _dayChangeTimer;
 
+  /// Jadwal besok, dipakai hanya saat semua solat hari ini sudah lewat.
+  /// Disimpan di luar state karena bukan bagian dari jadwal yang ditampilkan —
+  /// perannya sebatas sumber waktu Subuh besok yang sahih.
+  PrayerTime? _tomorrowPrayerTime;
+
+  /// Tanggal yang diwakili [_tomorrowPrayerTime]. Tanpa ini, jadwal yang
+  /// diambil semalam masih akan dianggap "besok" setelah lewat tengah malam.
+  DateTime? _tomorrowDate;
+
+  /// Penjaga agar _updateNextPrayer dan _loadTomorrowPrayerTimes tidak saling
+  /// memanggil berulang saat jadwal besok belum tersedia.
+  bool _loadingTomorrow = false;
+
   @override
   PrayerTimesState build() {
     _loadTodayPrayerTimes();
@@ -120,6 +133,36 @@ class PrayerTimesNotifier extends Notifier<PrayerTimesState> {
     await _loadTodayPrayerTimes();
   }
 
+  /// Ambil jadwal besok, dipakai untuk menghitung mundur ke Subuh besok.
+  ///
+  /// Hampir selalu dilayani dari cache lokal karena [prefetchPrayerTimes]
+  /// sudah menyimpan beberapa hari ke depan, jadi ini biasanya tidak menyentuh
+  /// jaringan sama sekali.
+  Future<void> _loadTomorrowPrayerTimes() async {
+    if (_loadingTomorrow) return;
+    _loadingTomorrow = true;
+    try {
+      final cityId = await _preferencesService.getCityId();
+      if (cityId == null) return;
+
+      final tomorrow = DateTime.now().add(const Duration(days: 1));
+      final prayerTime = await _prayerApiService.getPrayerTimes(
+        cityId: cityId,
+        date: tomorrow,
+      );
+      if (prayerTime == null) return;
+
+      _tomorrowPrayerTime = prayerTime;
+      _tomorrowDate = DateTime(tomorrow.year, tomorrow.month, tomorrow.day);
+      _updateNextPrayer();
+    } catch (_) {
+      // Dibiarkan kosong: kartu akan menampilkan "waktu tidak diketahui",
+      // yang lebih jujur daripada menampilkan angka hasil tebakan.
+    } finally {
+      _loadingTomorrow = false;
+    }
+  }
+
   /// Update next prayer info
   void _updateNextPrayer() {
     if (state.prayerTime == null) return;
@@ -147,24 +190,51 @@ class PrayerTimesNotifier extends Notifier<PrayerTimesState> {
       }
     }
 
-    // All prayers passed for today — count down to tomorrow's Subuh instead of
-    // dropping the countdown, which used to leave the card showing a stale
-    // duration next to a "besok" label.
-    final tomorrowSubuh = _parseTime(pt.subuh)?.add(const Duration(days: 1));
-    state = state.copyWith(
+    // Semua solat hari ini sudah lewat, jadi yang berikutnya adalah Subuh
+    // besok. Waktunya TIDAK boleh diambil dari Subuh hari ini: jadwal solat
+    // bergeser setiap hari, sehingga angka itu hanya tebakan yang tampil di
+    // layar seolah pasti. Pakai jadwal besok yang sebenarnya — biasanya sudah
+    // ada di cache lokal berkat prefetch — dan bila memang belum tersedia,
+    // tampilkan tanpa jam dan tanpa hitungan mundur.
+    final tomorrow = now.add(const Duration(days: 1));
+    final hasFreshTomorrow =
+        _tomorrowDate != null &&
+        _tomorrowDate!.year == tomorrow.year &&
+        _tomorrowDate!.month == tomorrow.month &&
+        _tomorrowDate!.day == tomorrow.day;
+    final subuhBesok = hasFreshTomorrow ? _tomorrowPrayerTime?.subuh : null;
+
+    if (subuhBesok == null) {
+      unawaited(_loadTomorrowPrayerTimes());
+    }
+
+    final subuhBesokTime = subuhBesok == null
+        ? null
+        : _parseTime(subuhBesok, onDate: tomorrow);
+
+    // Dibangun langsung, bukan lewat copyWith: copyWith memakai `??` sehingga
+    // nilai null justru mempertahankan angka lama — persis yang harus dihindari
+    // di sini, karena tujuannya adalah tidak menampilkan angka apa pun.
+    state = PrayerTimesState(
+      prayerTime: state.prayerTime,
+      isLoading: state.isLoading,
+      error: state.error,
       nextPrayerName: 'Subuh (besok)',
-      nextPrayerTime: pt.subuh,
-      remainingTime: tomorrowSubuh?.difference(now),
+      nextPrayerTime: subuhBesok,
+      remainingTime: subuhBesokTime?.difference(now),
     );
   }
 
   /// Parse time string to DateTime
-  DateTime? _parseTime(String timeStr) {
+  ///
+  /// [onDate] menentukan tanggal yang dipasangkan ke jam tersebut; bila tidak
+  /// diisi, dipakai hari ini.
+  DateTime? _parseTime(String timeStr, {DateTime? onDate}) {
     try {
       final parts = timeStr.split(':');
       if (parts.length != 2) return null;
 
-      final now = DateTime.now();
+      final now = onDate ?? DateTime.now();
       return DateTime(
         now.year,
         now.month,
