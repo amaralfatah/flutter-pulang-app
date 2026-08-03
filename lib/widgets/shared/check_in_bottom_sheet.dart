@@ -78,12 +78,37 @@ class CheckInBottomSheet extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Title
-            Text(
-              isEdit ? 'Edit $displayName' : 'Catat $displayName',
-              style: Theme.of(
-                context,
-              ).textTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
+            // Title, with an implicit delete affordance tucked in the
+            // corner — it's a destructive shortcut, not a primary choice,
+            // so it shouldn't compete with the status options below.
+            // A left spacer matching the trailing button's width keeps the
+            // title visually centered instead of drifting toward the icon.
+            Row(
+              children: [
+                const SizedBox(width: 48),
+                Expanded(
+                  child: Text(
+                    isEdit ? 'Edit $displayName' : 'Catat $displayName',
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                SizedBox(
+                  width: 48,
+                  child: isEdit && onDelete != null
+                      ? IconButton(
+                          onPressed: onDelete,
+                          icon: Icon(
+                            Icons.delete_outline_rounded,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          tooltip: 'Hapus catatan',
+                        )
+                      : null,
+                ),
+              ],
             ),
 
             // Optional Subtitle (e.g., date)
@@ -132,21 +157,6 @@ class CheckInBottomSheet extends StatelessWidget {
             ),
 
             const SizedBox(height: 24),
-
-            // Delete: only offered when there's actually a record to remove.
-            if (isEdit && onDelete != null) ...[
-              TextButton.icon(
-                onPressed: onDelete,
-                icon: Icon(Icons.delete_outline_rounded, color: colorScheme.error),
-                label: Text(
-                  'Hapus catatan',
-                  style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                    color: colorScheme.error,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 4),
-            ],
 
             // Cancel Button
             TextButton(

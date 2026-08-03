@@ -29,7 +29,9 @@ class CheckInOption extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    // Map type to M3 container colors using semantic extensions
+    // Map type to M3 container colors using semantic extensions. The badge
+    // keeps each option's color identity even though the row itself is flat,
+    // so the three options stay distinguishable at a glance.
     final (Color containerColor, Color contentColor) = switch (type) {
       CheckInType.onTime => (
         colorScheme.statusOnTimeContainer,
@@ -45,23 +47,36 @@ class CheckInOption extends StatelessWidget {
       ),
     };
 
-    return Card(
-      // elevation: isSelected ? 0 : 1,
-      color: containerColor,
-      shape: isSelected
-          ? RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(12),
-              side: BorderSide(color: contentColor, width: 2),
-            )
-          : null,
+    // Selected-state border/check use the bright (non-container) tone —
+    // the container tone is muted in dark mode and read as barely-there.
+    final Color activeColor = switch (type) {
+      CheckInType.onTime => colorScheme.statusOnTime,
+      CheckInType.late => colorScheme.statusLate,
+      CheckInType.missed => colorScheme.statusMissed,
+    };
+
+    return Material(
+      color: colorScheme.surfaceContainerHigh,
+      borderRadius: BorderRadius.circular(12),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
+        child: Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            border: isSelected
+                ? Border.all(color: activeColor, width: 2)
+                : null,
+          ),
+          padding: const EdgeInsets.all(12),
           child: Row(
             children: [
-              Icon(icon, color: contentColor, size: 32),
+              CircleAvatar(
+                radius: 20,
+                backgroundColor: containerColor,
+                foregroundColor: contentColor,
+                child: Icon(icon, size: 20),
+              ),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(
@@ -69,9 +84,10 @@ class CheckInOption extends StatelessWidget {
                   children: [
                     Text(
                       title,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: contentColor,
+                      style: Theme.of(
+                        context,
+                      ).textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                     Text(
@@ -84,13 +100,7 @@ class CheckInOption extends StatelessWidget {
                 ),
               ),
               if (isSelected)
-                Icon(Icons.check_circle_rounded, color: contentColor, size: 24)
-              else
-                Icon(
-                  Icons.arrow_forward_ios_rounded,
-                  color: contentColor,
-                  size: 16,
-                ),
+                Icon(Icons.check_circle_rounded, color: activeColor, size: 24),
             ],
           ),
         ),
