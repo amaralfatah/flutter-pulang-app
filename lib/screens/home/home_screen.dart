@@ -18,6 +18,8 @@ class HomeScreen extends ConsumerWidget {
     // Watch providers
     final prayerTimesState = ref.watch(prayerTimesProvider);
     final todayPrayersState = ref.watch(todayPrayersProvider);
+    final showBackupWarning =
+        ref.watch(backupWarningProvider).value ?? false;
 
     // Actions
     final prayerTimesNotifier = ref.read(prayerTimesProvider.notifier);
@@ -35,9 +37,23 @@ class HomeScreen extends ConsumerWidget {
             tooltip: 'Kiblat',
           ),
           IconButton(
-            icon: const Icon(Icons.settings_outlined),
+            // Sesi Google kadang lepas sendiri; tanda ini mengingatkan bahwa
+            // catatan yang sudah ada belum ter-backup ke Drive.
+            icon: Badge(
+              isLabelVisible: showBackupWarning,
+              backgroundColor: Theme.of(context).colorScheme.tertiary,
+              padding: EdgeInsets.zero,
+              label: Icon(
+                Icons.priority_high_rounded,
+                size: 12,
+                color: Theme.of(context).colorScheme.onTertiary,
+              ),
+              child: const Icon(Icons.settings_outlined),
+            ),
             onPressed: () => context.push(AppRoutes.settings),
-            tooltip: 'Pengaturan',
+            tooltip: showBackupWarning
+                ? 'Pengaturan — backup Google belum terhubung'
+                : 'Pengaturan',
           ),
         ],
       ),

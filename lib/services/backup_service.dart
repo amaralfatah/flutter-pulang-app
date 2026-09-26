@@ -137,6 +137,31 @@ class BackupService {
     return email != null && email.isNotEmpty;
   }
 
+  /// Whether Drive backup can run right now without user action.
+  ///
+  /// The stored email alone isn't enough: the platform grant can be revoked
+  /// or expire on its own ("Google logs out by itself"), leaving the email
+  /// behind. Checks the cached grant silently — never shows UI. When the
+  /// grant is gone, the stale email is cleared so the app shows the account
+  /// as logged out and the user can simply sign in again. On errors (e.g.
+  /// offline) trusts the stored email to avoid false alarms.
+  Future<bool> isBackupConnected() async {
+    if (!await _hasConnectedAccount()) return false;
+
+    final AuthClient? client;
+    try {
+      client = await _getAuthClient(allowInteraction: false);
+    } catch (e) {
+      debugPrint('Backup connection check error: $e');
+      return true;
+    }
+    if (client != null) return true;
+
+    _currentUser = null;
+    await _preferencesService.setGoogleAccountEmail(null);
+    return false;
+  }
+
   Future<void> _ensureSignedIn() async {
     if (!_isInitialized) await init();
     if (!await _hasConnectedAccount()) throw Exception('Not signed in');

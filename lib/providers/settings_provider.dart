@@ -46,6 +46,9 @@ class SettingsState {
     bool? autoBackupEnabled,
     String? lastBackupDate,
     String? googleAccountEmail,
+    // `googleAccountEmail: null` can't mean "clear" (null = keep), so
+    // clearing needs its own flag.
+    bool clearGoogleAccountEmail = false,
     String? themeMode,
     bool? isLoading,
   }) {
@@ -55,7 +58,9 @@ class SettingsState {
       notificationEnabled: notificationEnabled ?? this.notificationEnabled,
       autoBackupEnabled: autoBackupEnabled ?? this.autoBackupEnabled,
       lastBackupDate: lastBackupDate ?? this.lastBackupDate,
-      googleAccountEmail: googleAccountEmail ?? this.googleAccountEmail,
+      googleAccountEmail: clearGoogleAccountEmail
+          ? null
+          : googleAccountEmail ?? this.googleAccountEmail,
       themeMode: themeMode ?? this.themeMode,
       isLoading: isLoading ?? this.isLoading,
     );
@@ -149,13 +154,16 @@ class SettingsNotifier extends Notifier<SettingsState> {
   /// Set Google account email
   Future<void> setGoogleAccountEmail(String? email) async {
     await _preferencesService.setGoogleAccountEmail(email);
-    state = state.copyWith(googleAccountEmail: email);
+    state = state.copyWith(
+      googleAccountEmail: email,
+      clearGoogleAccountEmail: email == null,
+    );
   }
 
   /// Clear Google account
   Future<void> clearGoogleAccount() async {
     await _preferencesService.setGoogleAccountEmail(null);
-    state = state.copyWith(googleAccountEmail: null);
+    state = state.copyWith(clearGoogleAccountEmail: true);
   }
 
   /// Set theme mode ('system', 'light', 'dark')
@@ -172,6 +180,27 @@ class SettingsNotifier extends Notifier<SettingsState> {
 final settingsProvider = NotifierProvider<SettingsNotifier, SettingsState>(
   SettingsNotifier.new,
 );
+
+/// True when prayers are recorded but Google Drive backup isn't connected
+/// (never signed in, or the grant was lost) — the data is at risk.
+/// Re-evaluates on account changes and on every check-in.
+final backupWarningProvider = FutureProvider<bool>((ref) async {
+  final settings = ref.watch(settingsProvider);
+  ref.watch(todayPrayersProvider);
+  if (settings.isLoading) return false;
+
+  final hasData =
+      await ref.read(databaseServiceProvider).getFirstRecordDate() != null;
+  if (!hasData) return false;
+
+  final connected = await ref.read(backupServiceProvider).isBackupConnected();
+  // The check clears a stale email when the grant is gone; sync the settings
+  // state so the Settings screen shows the account as logged out too.
+  if (!connected && settings.isGoogleConnected) {
+    await ref.read(settingsProvider.notifier).clearGoogleAccount();
+  }
+  return !connected;
+});
 
 /// Provider for city name display
 final cityDisplayProvider = Provider<String>((ref) {
