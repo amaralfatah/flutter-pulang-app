@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../app/extensions/color_scheme_extensions.dart';
+import '../../app/extensions/context_extensions.dart';
 import '../../models/models.dart';
 import '../../providers/providers.dart';
 import '../../widgets/shared/prayer_card.dart';
@@ -88,7 +89,7 @@ class _TotalCard extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final since = DateFormat(
       'd MMMM yyyy',
-      'id_ID',
+      context.localeTag,
     ).format(DateTime.parse(ledger.startDate!));
 
     return Card(
@@ -100,7 +101,7 @@ class _TotalCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Belum diqadha',
+              context.l10n.qadhaOutstandingTitle,
               style: textTheme.titleMedium?.copyWith(
                 color: colorScheme.onStatusMissedContainer,
               ),
@@ -118,7 +119,7 @@ class _TotalCard extends StatelessWidget {
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  'solat',
+                  context.l10n.qadhaOutstandingUnit,
                   style: textTheme.titleMedium?.copyWith(
                     color: colorScheme.onStatusMissedContainer,
                   ),
@@ -127,7 +128,7 @@ class _TotalCard extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              'Tercatat sejak $since',
+              context.l10n.qadhaRecordedSince(since),
               style: textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onStatusMissedContainer,
               ),
@@ -168,7 +169,7 @@ class _QadhaDayCardState extends ConsumerState<_QadhaDayCard> {
     // tidak perlu badge angka yang mengulanginya.
     final title = DateFormat(
       'EEE, d MMMM yyyy',
-      'id_ID',
+      context.localeTag,
     ).format(DateTime.parse(_day.date));
     final colorScheme = Theme.of(context).colorScheme;
 
@@ -190,7 +191,7 @@ class _QadhaDayCardState extends ConsumerState<_QadhaDayCard> {
                 if (_day.prayers.length > 1)
                   TextButton(
                     onPressed: _paying.isEmpty ? _payAll : null,
-                    child: const Text('Lunas semua'),
+                    child: Text(context.l10n.qadhaPayAllCta),
                   ),
               ],
             ),
@@ -212,7 +213,7 @@ class _QadhaDayCardState extends ConsumerState<_QadhaDayCard> {
                           ),
                         )
                       : Icon(prayerIcon(prayer.prayerName), size: 18),
-                  label: Text(prayer.prayerName.displayName),
+                  label: Text(prayer.prayerName.label(context.l10n)),
                   onPressed: isPaying ? null : () => _payOne(prayer),
                 );
               }).toList(),
@@ -226,16 +227,19 @@ class _QadhaDayCardState extends ConsumerState<_QadhaDayCard> {
   /// Melunasi satu waktu solat — meminta konfirmasi dulu karena tidak boleh
   /// terjadi hanya karena salah ketuk.
   Future<void> _payOne(Prayer prayer) async {
+    final l10n = context.l10n;
     final confirmed = await _confirmPay(
-      title: 'Tandai lunas?',
-      message:
-          '${prayer.prayerName.displayName} ${_shortDate(_day.date)} akan '
-          'ditandai lunas.',
+      title: l10n.qadhaConfirmOneTitle,
+      message: l10n.qadhaConfirmOneBody(
+        prayer.prayerName.label(l10n),
+        _shortDate(context, _day.date),
+      ),
     );
     if (!confirmed || !mounted) return;
 
     final id = prayer.id!;
     final date = _day.date;
+    final dateLabel = _shortDate(context, date);
     setState(() => _paying.add(id));
     final messenger = ScaffoldMessenger.of(context);
     final notifier = ref.read(ledgerProvider.notifier);
@@ -248,12 +252,12 @@ class _QadhaDayCardState extends ConsumerState<_QadhaDayCard> {
     messenger.showSnackBar(
       SnackBar(
         content: Text(
-          '${prayer.prayerName.displayName} ${_shortDate(date)} lunas.',
+          l10n.qadhaPaidOneSnackbar(prayer.prayerName.label(l10n), dateLabel),
         ),
         // Lihat catatan di home_screen: tanpa ini snackbar tidak hilang sendiri.
         persist: false,
         action: SnackBarAction(
-          label: 'Urungkan',
+          label: l10n.commonUndo,
           onPressed: () => notifier.undoPayQadha([paid.id!]),
         ),
       ),
@@ -262,16 +266,19 @@ class _QadhaDayCardState extends ConsumerState<_QadhaDayCard> {
 
   /// Melunasi seluruh hutang hari ini sekaligus, satu snackbar untuk semua.
   Future<void> _payAll() async {
+    final l10n = context.l10n;
     final prayers = _day.prayers;
     final confirmed = await _confirmPay(
-      title: 'Tandai semua lunas?',
-      message:
-          '${prayers.length} hutang solat ${_shortDate(_day.date)} akan '
-          'ditandai lunas sekaligus.',
+      title: l10n.qadhaConfirmAllTitle,
+      message: l10n.qadhaConfirmAllBody(
+        prayers.length,
+        _shortDate(context, _day.date),
+      ),
     );
     if (!confirmed || !mounted) return;
 
     final date = _day.date;
+    final dateLabel = _shortDate(context, date);
     setState(() => _paying.addAll(prayers.map((p) => p.id!)));
     final messenger = ScaffoldMessenger.of(context);
     final notifier = ref.read(ledgerProvider.notifier);
@@ -287,10 +294,10 @@ class _QadhaDayCardState extends ConsumerState<_QadhaDayCard> {
 
     messenger.showSnackBar(
       SnackBar(
-        content: Text('${ids.length} qadha ${_shortDate(date)} lunas.'),
+        content: Text(l10n.qadhaPaidAllSnackbar(ids.length, dateLabel)),
         persist: false,
         action: SnackBarAction(
-          label: 'Urungkan',
+          label: l10n.commonUndo,
           onPressed: () => notifier.undoPayQadha(ids),
         ),
       ),
@@ -310,11 +317,11 @@ class _QadhaDayCardState extends ConsumerState<_QadhaDayCard> {
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Batal'),
+            child: Text(context.l10n.commonCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Ya, lunas'),
+            child: Text(context.l10n.qadhaConfirmCta),
           ),
         ],
       ),
@@ -341,7 +348,7 @@ class _NoDebtCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'Tidak ada hutang solat',
+            context.l10n.qadhaNoDebt,
             style: Theme.of(context).textTheme.titleMedium,
             textAlign: TextAlign.center,
           ),
@@ -351,8 +358,8 @@ class _NoDebtCard extends StatelessWidget {
   }
 }
 
-String _shortDate(String date) =>
-    DateFormat('d MMM yyyy', 'id_ID').format(DateTime.parse(date));
+String _shortDate(BuildContext context, String date) =>
+    DateFormat('d MMM yyyy', context.localeTag).format(DateTime.parse(date));
 
 /// Tautan ringkas ke hari-hari yang belum tercatat — bukan urusan Qadha.
 ///
@@ -376,7 +383,7 @@ class _UnconfirmedDaysRow extends ConsumerWidget {
       margin: const EdgeInsets.symmetric(horizontal: 16),
       child: ListTile(
         leading: const Icon(Icons.event_busy_outlined),
-        title: Text('$count hari belum tercatat'),
+        title: Text(context.l10n.qadhaUnconfirmedDaysRow(count)),
         trailing: const Icon(Icons.chevron_right),
         onTap: () => showUnconfirmedDaysPicker(context, ref, incompleteDays),
       ),
@@ -398,7 +405,7 @@ class _ErrorCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Text(
-          'Gagal memuat data qadha: $message',
+          context.l10n.qadhaErrorPrefix(message),
           style: Theme.of(
             context,
           ).textTheme.bodyMedium?.copyWith(color: colorScheme.onErrorContainer),
@@ -425,14 +432,13 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'Belum ada catatan',
+            context.l10n.qadhaEmptyTitle,
             style: Theme.of(context).textTheme.titleMedium,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           Text(
-            'Mulai catat solatmu di Home. Hutang qadha dihitung sejak catatan '
-            'pertama, dan hanya dari solat yang kamu tandai terlewat.',
+            context.l10n.qadhaEmptyBody,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
 import '../../app/extensions/color_scheme_extensions.dart';
+import '../../app/extensions/context_extensions.dart';
 import '../../models/models.dart';
 import '../../providers/providers.dart';
 import '../../widgets/shared/prayer_card.dart';
@@ -40,7 +41,7 @@ class StatisticsView extends ConsumerWidget {
           longestStreak: state.longestStreak,
         ),
         const SizedBox(height: 24),
-        const _SectionHeader('Rincian per Waktu'),
+        _SectionHeader(context.l10n.statsSectionBreakdown),
         Card(
           margin: const EdgeInsets.symmetric(horizontal: 16),
           child: Padding(
@@ -88,7 +89,7 @@ class _OverallCard extends StatelessWidget {
     final percentage = overall.fulfilledRatio * 100;
     final since = DateFormat(
       'd MMMM yyyy',
-      'id_ID',
+      context.localeTag,
     ).format(DateTime.parse(ledger.startDate!));
 
     return Card(
@@ -99,7 +100,7 @@ class _OverallCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              'Sejak $since',
+              context.l10n.statsSince(since),
               style: textTheme.labelMedium?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
@@ -120,14 +121,19 @@ class _OverallCard extends StatelessWidget {
                 minHeight: 8,
                 backgroundColor: colorScheme.outlineVariant,
                 color: colorScheme.primary,
-                semanticsLabel: 'Konsistensi sepanjang riwayat',
-                semanticsValue: '${percentage.toStringAsFixed(0)} persen',
+                semanticsLabel: context.l10n.statsConsistencySemantics,
+                semanticsValue: context.l10n.statsPercentSemantics(
+                  percentage.toStringAsFixed(0),
+                ),
               ),
             ),
             const SizedBox(height: 10),
             Text(
-              '${overall.fulfilled} dari ${overall.known} solat tercatat '
-              'sudah dikerjakan · ${ledger.closedDays} hari',
+              context.l10n.statsFulfilledSummary(
+                overall.fulfilled,
+                overall.known,
+                ledger.closedDays,
+              ),
               style: textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
@@ -143,7 +149,7 @@ class _OverallCard extends StatelessWidget {
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    'Streak $currentStreak hari · terpanjang $longestStreak hari',
+                    context.l10n.statsStreak(currentStreak, longestStreak),
                     style: textTheme.bodyMedium,
                   ),
                 ),
@@ -183,8 +189,10 @@ class _InsightNote extends StatelessWidget {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              '${weakest.displayName} paling sering terlewat — '
-              '${tally.outstanding} kali belum diqadha.',
+              context.l10n.statsWeakestInsight(
+                weakest.label(context.l10n),
+                tally.outstanding,
+              ),
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
@@ -217,7 +225,7 @@ class _PrayerBreakdownTile extends StatelessWidget {
           SizedBox(
             width: 72,
             child: Text(
-              prayerName.displayName,
+              prayerName.label(context.l10n),
               style: textTheme.bodyMedium,
               overflow: TextOverflow.ellipsis,
             ),
@@ -314,9 +322,7 @@ class _UnrecordedNote extends ConsumerWidget {
           children: [
             Expanded(
               child: Text(
-                count == 1
-                    ? '1 hari tidak pernah tercatat dan tidak dihitung sebagai hutang.'
-                    : '$count hari tidak pernah tercatat dan tidak dihitung sebagai hutang.',
+                context.l10n.statsUnrecordedNote(count),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),
@@ -348,7 +354,7 @@ class _ErrorCard extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Text(
-          'Error: $message',
+          context.l10n.statsErrorPrefix(message),
           style: Theme.of(
             context,
           ).textTheme.bodyMedium?.copyWith(color: colorScheme.onErrorContainer),
@@ -375,13 +381,13 @@ class _EmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'Belum ada statistik',
+            context.l10n.statsEmptyTitle,
             style: Theme.of(context).textTheme.titleMedium,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           Text(
-            'Catat solatmu di Home untuk melihat konsistensi dan streak di sini.',
+            context.l10n.statsEmptyBody,
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),

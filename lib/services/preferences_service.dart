@@ -13,6 +13,7 @@ class PreferencesService {
   static const String _keyGoogleAccountEmail = 'google_account_email';
   static const String _keyThemeMode = 'theme_mode';
   static const String _keyOnboardingCompleted = 'onboarding_completed';
+  static const String _keyLanguageCode = 'language_code';
 
   /// Initialize SharedPreferences
   Future<void> init() async {
@@ -126,6 +127,20 @@ class PreferencesService {
   Future<bool> setThemeMode(String mode) async {
     final p = await prefs;
     return p.setString(_keyThemeMode, mode);
+  }
+
+  // ============ LANGUAGE ============
+
+  /// Get language setting ('system', 'id', 'en')
+  Future<String> getLanguageCode() async {
+    final p = await prefs;
+    return p.getString(_keyLanguageCode) ?? 'system';
+  }
+
+  /// Set language setting
+  Future<bool> setLanguageCode(String code) async {
+    final p = await prefs;
+    return p.setString(_keyLanguageCode, code);
   }
 
   // ============ ONBOARDING ============

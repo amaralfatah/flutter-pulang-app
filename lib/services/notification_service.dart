@@ -1,9 +1,12 @@
 import 'dart:io';
+import 'dart:ui';
 
 import 'package:android_alarm_manager_plus/android_alarm_manager_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import '../l10n/app_localizations.dart';
+import '../l10n/locale_resolver.dart';
 import '../models/models.dart';
 import 'preferences_service.dart';
 import 'prayer_api_service.dart';
@@ -30,6 +33,17 @@ class NotificationService {
       FlutterLocalNotificationsPlugin();
 
   bool _isInitialized = false;
+
+  /// Teks notifikasi sesuai setting bahasa. Aman dipanggil dari isolate
+  /// AlarmManager karena tidak butuh BuildContext.
+  static Future<AppLocalizations> _l10n() async {
+    final setting = await PreferencesService().getLanguageCode();
+    final code = resolveLanguageCode(
+      setting,
+      PlatformDispatcher.instance.locale,
+    );
+    return lookupAppLocalizations(Locale(code));
+  }
 
   /// Initialize notifications and alarm manager
   Future<void> init() async {
@@ -66,11 +80,12 @@ class NotificationService {
           AndroidFlutterLocalNotificationsPlugin
         >();
 
+    final l10n = await _l10n();
     await androidImplementation?.createNotificationChannel(
-      const AndroidNotificationChannel(
+      AndroidNotificationChannel(
         'prayer_channel',
-        'Jadwal Solat',
-        description: 'Notifikasi saat masuk waktu solat',
+        l10n.notificationChannelName,
+        description: l10n.notificationChannelDescription,
         importance: Importance.max,
         playSound: true,
       ),
@@ -125,18 +140,19 @@ class NotificationService {
     required String body,
   }) async {
     try {
+      final l10n = await _l10n();
       await _notificationsPlugin.show(
         id,
         title,
         body,
-        const NotificationDetails(
+        NotificationDetails(
           android: AndroidNotificationDetails(
             'prayer_channel',
-            'Jadwal Solat',
+            l10n.notificationChannelName,
             importance: Importance.max,
             priority: Priority.high,
           ),
-          iOS: DarwinNotificationDetails(),
+          iOS: const DarwinNotificationDetails(),
         ),
       );
     } catch (e) {
@@ -165,16 +181,18 @@ class NotificationService {
     }
 
     // 3. Define prayers
+    final l10n = await _l10n();
     final prayers = [
-      ('Subuh', prayerTime.subuh, 1),
-      ('Dzuhur', prayerTime.dzuhur, 2),
-      ('Ashar', prayerTime.ashar, 3),
-      ('Maghrib', prayerTime.maghrib, 4),
-      ('Isya', prayerTime.isya, 5),
+      (PrayerName.subuh, prayerTime.subuh, 1),
+      (PrayerName.dzuhur, prayerTime.dzuhur, 2),
+      (PrayerName.ashar, prayerTime.ashar, 3),
+      (PrayerName.maghrib, prayerTime.maghrib, 4),
+      (PrayerName.isya, prayerTime.isya, 5),
     ];
 
     var scheduledCount = 0;
-    for (final (name, timeStr, id) in prayers) {
+    for (final (prayer, timeStr, id) in prayers) {
+      final name = prayer.label(l10n);
       final timeParts = timeStr.split(':');
       final hour = int.parse(timeParts[0]);
       final minute = int.parse(timeParts[1]);
@@ -197,7 +215,10 @@ class NotificationService {
           exact: true,
           wakeup: true,
           rescheduleOnReboot: true,
-          params: {'title': 'Waktu $name', 'body': 'Sudah masuk waktu $name'},
+          params: {
+            'title': l10n.notificationPrayerTitle(name),
+            'body': l10n.notificationPrayerBody(name),
+          },
         );
         scheduledCount++;
         debugPrint('[Notif] Scheduled $name at $timeStr (id=$id)');
@@ -217,6 +238,7 @@ class NotificationService {
     Duration delay = const Duration(minutes: 1),
   }) async {
     final fireAt = DateTime.now().add(delay);
+    final l10n = await _l10n();
     await AndroidAlarmManager.oneShotAt(
       fireAt,
       99, // dedicated test id, outside the 1-5 prayer range
@@ -225,8 +247,8 @@ class NotificationService {
       wakeup: true,
       rescheduleOnReboot: false,
       params: {
-        'title': 'Test Notifikasi Terjadwal',
-        'body': 'Jika kamu melihat ini, alarm terjadwal berfungsi.',
+        'title': l10n.notificationTestTitle,
+        'body': l10n.notificationTestBody,
       },
     );
     debugPrint('[Notif] Test alarm scheduled at ${fireAt.toIso8601String()}');

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../app/extensions/context_extensions.dart';
 import '../../app/router.dart' as app_router;
 import '../../providers/providers.dart';
 import '../../services/services.dart';
@@ -131,7 +132,7 @@ class _WelcomePage extends StatelessWidget {
           ),
           const SizedBox(height: 32),
           Text(
-            'Selamat datang di Pulang',
+            context.l10n.onboardingWelcomeTitle,
             style: Theme.of(
               context,
             ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
@@ -139,8 +140,7 @@ class _WelcomePage extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Text(
-            'Catat solat harianmu, pantau hutang qadha, dan lihat konsistensi '
-            'dari waktu ke waktu. Dua langkah singkat dulu sebelum mulai.',
+            context.l10n.onboardingWelcomeBody,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
@@ -152,7 +152,7 @@ class _WelcomePage extends StatelessWidget {
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(52),
             ),
-            child: const Text('Mulai'),
+            child: Text(context.l10n.onboardingWelcomeCta),
           ),
         ],
       ),
@@ -245,15 +245,14 @@ class _CityPageState extends ConsumerState<_CityPage> {
           Icon(Icons.location_on_rounded, size: 40, color: colorScheme.primary),
           const SizedBox(height: 16),
           Text(
-            'Pilih kota kamu',
+            context.l10n.onboardingCityTitle,
             style: Theme.of(
               context,
             ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
-            'Dipakai untuk menghitung jadwal solat harian. Bisa diganti kapan '
-            'saja lewat Pengaturan.',
+            context.l10n.onboardingCityBody,
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
@@ -282,7 +281,7 @@ class _CityPageState extends ConsumerState<_CityPage> {
                   ),
                   TextButton(
                     onPressed: () => setState(() => _selectedCityName = null),
-                    child: const Text('Ganti'),
+                    child: Text(context.l10n.commonChange),
                   ),
                 ],
               ),
@@ -293,7 +292,9 @@ class _CityPageState extends ConsumerState<_CityPage> {
               autofocus: true,
               textInputAction: TextInputAction.search,
               decoration: InputDecoration(
-                hintText: 'Cari nama kota (min. $_minQueryLength huruf)',
+                hintText: context.l10n.onboardingCitySearchHint(
+                  _minQueryLength,
+                ),
                 filled: true,
                 fillColor: colorScheme.surfaceContainerHighest,
                 border: OutlineInputBorder(
@@ -319,7 +320,7 @@ class _CityPageState extends ConsumerState<_CityPage> {
               child: query.length >= _minQueryLength && _cities.isEmpty && !_isSearching
                   ? Center(
                       child: Text(
-                        'Kota tidak ditemukan',
+                        context.l10n.onboardingCityNotFound,
                         style: TextStyle(color: colorScheme.onSurfaceVariant),
                       ),
                     )
@@ -341,7 +342,7 @@ class _CityPageState extends ConsumerState<_CityPage> {
               Expanded(
                 child: TextButton(
                   onPressed: widget.onSkip,
-                  child: const Text('Lewati'),
+                  child: Text(context.l10n.commonSkip),
                 ),
               ),
               const SizedBox(width: 12),
@@ -349,7 +350,7 @@ class _CityPageState extends ConsumerState<_CityPage> {
                 flex: 2,
                 child: FilledButton(
                   onPressed: _selectedCityName == null ? null : widget.onNext,
-                  child: const Text('Lanjut'),
+                  child: Text(context.l10n.commonNext),
                 ),
               ),
             ],
@@ -402,15 +403,14 @@ class _NotificationPageState extends ConsumerState<_NotificationPage> {
           ),
           const SizedBox(height: 16),
           Text(
-            'Aktifkan pengingat solat',
+            context.l10n.onboardingNotifTitle,
             style: Theme.of(
               context,
             ).textTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
           Text(
-            'Pulang mengingatkanmu tepat saat masuk waktu solat. Kamu bisa '
-            'mengatur ulang ini kapan saja di Pengaturan.',
+            context.l10n.onboardingNotifBody,
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
@@ -420,8 +420,7 @@ class _NotificationPageState extends ConsumerState<_NotificationPage> {
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
               child: Text(
-                'Izin belum diberikan. Kamu tetap bisa lanjut — nyalakan lagi '
-                'lewat Pengaturan kapan pun kamu siap.',
+                context.l10n.onboardingNotifDenied,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),
@@ -440,7 +439,7 @@ class _NotificationPageState extends ConsumerState<_NotificationPage> {
                       ),
                     )
                   : const Icon(Icons.notifications_rounded),
-              label: const Text('Aktifkan Notifikasi'),
+              label: Text(context.l10n.onboardingNotifEnableCta),
               style: FilledButton.styleFrom(
                 minimumSize: const Size.fromHeight(52),
               ),
@@ -458,7 +457,7 @@ class _NotificationPageState extends ConsumerState<_NotificationPage> {
                   Icon(Icons.check_circle_rounded, color: colorScheme.primary),
                   const SizedBox(width: 12),
                   Text(
-                    'Notifikasi aktif',
+                    context.l10n.onboardingNotifActive,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                       color: colorScheme.onPrimaryContainer,
@@ -473,7 +472,11 @@ class _NotificationPageState extends ConsumerState<_NotificationPage> {
             style: FilledButton.styleFrom(
               minimumSize: const Size.fromHeight(52),
             ),
-            child: Text(_granted == true ? 'Selesai' : 'Lewati & Selesai'),
+            child: Text(
+              _granted == true
+                  ? context.l10n.onboardingNotifDone
+                  : context.l10n.onboardingNotifSkipDone,
+            ),
           ),
         ],
       ),

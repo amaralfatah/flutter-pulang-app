@@ -1,3 +1,5 @@
+import '../l10n/app_localizations.dart';
+
 /// Pure helpers for the Qibla compass UI.
 ///
 /// These have no Flutter or sensor dependencies so they can be unit-tested in
@@ -34,20 +36,10 @@ class QiblaUtils {
     return '${normalizeDegrees(degrees).round()}\u00B0';
   }
 
-  /// Full Indonesian name for an 8-point cardinal abbreviation.
+  /// Localized full name for an 8-point cardinal abbreviation.
   ///
   /// Unknown abbreviations are returned unchanged.
-  static String cardinalName(String abbreviation) {
-    const names = {
-      'U': 'Utara',
-      'TL': 'Timur Laut',
-      'T': 'Timur',
-      'TG': 'Tenggara',
-      'S': 'Selatan',
-      'BD': 'Barat Daya',
-      'B': 'Barat',
-      'BL': 'Barat Laut',
-    };
-    return names[abbreviation] ?? abbreviation;
+  static String cardinalName(String abbreviation, AppLocalizations l10n) {
+    return l10n.qiblaCardinalName(abbreviation);
   }
 }

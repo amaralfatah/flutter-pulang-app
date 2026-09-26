@@ -11,7 +11,10 @@ class PrayerTimesState {
   final PrayerTime? prayerTime;
   final bool isLoading;
   final String? error;
-  final String? nextPrayerName;
+  final PrayerName? nextPrayer;
+  // True when every prayer today has already passed, so [nextPrayer] (always
+  // subuh in that case) refers to tomorrow's — the UI adds a "tomorrow" label.
+  final bool nextPrayerIsTomorrow;
   final String? nextPrayerTime;
   final Duration? remainingTime;
 
@@ -19,7 +22,8 @@ class PrayerTimesState {
     this.prayerTime,
     this.isLoading = false,
     this.error,
-    this.nextPrayerName,
+    this.nextPrayer,
+    this.nextPrayerIsTomorrow = false,
     this.nextPrayerTime,
     this.remainingTime,
   });
@@ -33,7 +37,8 @@ class PrayerTimesState {
     bool clearPrayerTime = false,
     bool? isLoading,
     String? error,
-    String? nextPrayerName,
+    PrayerName? nextPrayer,
+    bool? nextPrayerIsTomorrow,
     String? nextPrayerTime,
     Duration? remainingTime,
   }) {
@@ -41,7 +46,8 @@ class PrayerTimesState {
       prayerTime: clearPrayerTime ? null : (prayerTime ?? this.prayerTime),
       isLoading: isLoading ?? this.isLoading,
       error: error,
-      nextPrayerName: nextPrayerName ?? this.nextPrayerName,
+      nextPrayer: nextPrayer ?? this.nextPrayer,
+      nextPrayerIsTomorrow: nextPrayerIsTomorrow ?? this.nextPrayerIsTomorrow,
       nextPrayerTime: nextPrayerTime ?? this.nextPrayerTime,
       remainingTime: remainingTime ?? this.remainingTime,
     );
@@ -171,18 +177,19 @@ class PrayerTimesNotifier extends Notifier<PrayerTimesState> {
     final pt = state.prayerTime!;
 
     final prayers = [
-      ('Subuh', pt.subuh),
-      ('Dzuhur', pt.dzuhur),
-      ('Ashar', pt.ashar),
-      ('Maghrib', pt.maghrib),
-      ('Isya', pt.isya),
+      (PrayerName.subuh, pt.subuh),
+      (PrayerName.dzuhur, pt.dzuhur),
+      (PrayerName.ashar, pt.ashar),
+      (PrayerName.maghrib, pt.maghrib),
+      (PrayerName.isya, pt.isya),
     ];
 
     for (final (name, timeStr) in prayers) {
       final time = _parseTime(timeStr);
       if (time != null && time.isAfter(now)) {
         state = state.copyWith(
-          nextPrayerName: name,
+          nextPrayer: name,
+          nextPrayerIsTomorrow: false,
           nextPrayerTime: timeStr,
           remainingTime: time.difference(now),
         );
@@ -219,7 +226,8 @@ class PrayerTimesNotifier extends Notifier<PrayerTimesState> {
       prayerTime: state.prayerTime,
       isLoading: state.isLoading,
       error: state.error,
-      nextPrayerName: 'Subuh (besok)',
+      nextPrayer: PrayerName.subuh,
+      nextPrayerIsTomorrow: true,
       nextPrayerTime: subuhBesok,
       remainingTime: subuhBesokTime?.difference(now),
     );

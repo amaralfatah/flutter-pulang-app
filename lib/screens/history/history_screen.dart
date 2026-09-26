@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app/extensions/context_extensions.dart';
 import '../../providers/providers.dart';
 import 'calendar_view.dart';
 import 'statistics_view.dart';
@@ -28,7 +29,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Riwayat'),
+        title: Text(context.l10n.historyTitle),
         actions: [
           // Hanya relevan saat kalender tampil.
           if (isCalendar)
@@ -39,7 +40,7 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
                 notifier.onPageChanged(DateTime.now());
                 notifier.selectDay(DateTime.now());
               },
-              tooltip: 'Hari Ini',
+              tooltip: context.l10n.historyToday,
             ),
         ],
         bottom: PreferredSize(
@@ -47,16 +48,16 @@ class _HistoryScreenState extends ConsumerState<HistoryScreen> {
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
             child: SegmentedButton<HistoryTab>(
-              segments: const [
+              segments: [
                 ButtonSegment(
                   value: HistoryTab.calendar,
-                  icon: Icon(Icons.calendar_month_rounded),
-                  label: Text('Kalender'),
+                  icon: const Icon(Icons.calendar_month_rounded),
+                  label: Text(context.l10n.historyTabCalendar),
                 ),
                 ButtonSegment(
                   value: HistoryTab.statistics,
-                  icon: Icon(Icons.insights_rounded),
-                  label: Text('Ringkasan'),
+                  icon: const Icon(Icons.insights_rounded),
+                  label: Text(context.l10n.historyTabStatistics),
                 ),
               ],
               selected: {tab},

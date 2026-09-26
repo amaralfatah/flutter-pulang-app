@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../app/extensions/context_extensions.dart';
 import '../../app/router.dart';
 import '../../providers/providers.dart';
 
@@ -51,7 +52,7 @@ class _UnconfirmedDaysSheet extends StatelessWidget {
             child: Align(
               alignment: Alignment.centerLeft,
               child: Text(
-                'Pilih tanggal untuk membukanya di Kalender',
+                context.l10n.unconfirmedDaysPickerTitle,
                 style: Theme.of(
                   context,
                 ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
@@ -72,11 +73,12 @@ class _UnconfirmedDaysSheet extends StatelessWidget {
                     color: colorScheme.onSurfaceVariant,
                   ),
                   title: Text(
-                    DateFormat('EEEE, d MMMM yyyy', 'id_ID').format(parsed),
+                    DateFormat(
+                      'EEEE, d MMMM yyyy',
+                      context.localeTag,
+                    ).format(parsed),
                   ),
-                  subtitle: Text(
-                    missing == 1 ? '1 waktu belum tercatat' : '$missing waktu belum tercatat',
-                  ),
+                  subtitle: Text(context.l10n.calendarIncompleteTitle(missing)),
                   onTap: () => Navigator.pop(context, parsed),
                 );
               },

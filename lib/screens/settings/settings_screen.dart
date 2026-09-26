@@ -7,6 +7,7 @@ import 'package:intl/intl.dart';
 
 import 'package:googleapis/drive/v3.dart' as drive;
 
+import '../../app/extensions/context_extensions.dart';
 import '../../app/router.dart';
 import '../../providers/providers.dart';
 import '../../services/services.dart';
@@ -23,7 +24,7 @@ class SettingsScreen extends ConsumerWidget {
     final notifier = ref.read(settingsProvider.notifier);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Pengaturan')),
+      appBar: AppBar(title: Text(context.l10n.settingsTitle)),
       body: ListView(
         padding: const EdgeInsets.only(bottom: 24, top: 12),
         children: [
@@ -45,11 +46,11 @@ class SettingsScreen extends ConsumerWidget {
 
   /// [raw] is stored as ISO 8601; older installs may still have the legacy
   /// "yyyy-MM-dd HH:mm:ss" text, which also parses fine via [DateTime.tryParse].
-  String _formatBackupDate(String? raw) {
-    if (raw == null) return 'Belum pernah backup';
+  String _formatBackupDate(BuildContext context, String? raw) {
+    if (raw == null) return context.l10n.settingsNeverBackedUp;
     final parsed = DateTime.tryParse(raw);
     if (parsed == null) return raw;
-    return DateFormat('d MMM yyyy, HH:mm', 'id_ID').format(parsed);
+    return DateFormat('d MMM yyyy, HH:mm', context.localeTag).format(parsed);
   }
 
   /// M3 list subheader: `titleSmall` in the primary colour (no ad-hoc bold).
@@ -96,8 +97,8 @@ class SettingsScreen extends ConsumerWidget {
     return _buildSection(context, [
       ListTile(
         leading: _leadingIcon(context, Icons.location_on_outlined),
-        title: Text(settings.cityName ?? 'Belum pilih kota'),
-        subtitle: const Text('Digunakan untuk jadwal solat'),
+        title: Text(settings.cityName ?? context.l10n.settingsNoCitySelected),
+        subtitle: Text(context.l10n.settingsLocationSubtitle),
         trailing: Icon(
           Icons.chevron_right_rounded,
           color: Theme.of(context).colorScheme.onSurfaceVariant,
@@ -141,8 +142,8 @@ class SettingsScreen extends ConsumerWidget {
     return _buildSection(context, [
       SwitchListTile(
         secondary: _leadingIcon(context, Icons.notifications_active_outlined),
-        title: const Text('Aktifkan Notifikasi'),
-        subtitle: const Text('Notifikasi saat masuk waktu solat'),
+        title: Text(context.l10n.settingsNotifTitle),
+        subtitle: Text(context.l10n.settingsNotifSubtitle),
         value: settings.notificationEnabled,
         onChanged: (value) async {
           await notifier.setNotificationEnabled(value);
@@ -172,8 +173,7 @@ class SettingsScreen extends ConsumerWidget {
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        'Izin notifikasi ditolak di sistem — pengingat tidak '
-                        'akan muncul walau opsi ini aktif.',
+                        context.l10n.settingsNotifBlockedBanner,
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
                           color: colorScheme.onErrorContainer,
                         ),
@@ -191,7 +191,7 @@ class SettingsScreen extends ConsumerWidget {
                           .requestPermissions();
                       ref.invalidate(notificationsPermittedProvider);
                     },
-                    child: const Text('Minta Izin Lagi'),
+                    child: Text(context.l10n.settingsRequestPermissionAgain),
                   ),
                 ),
               ],
@@ -210,11 +210,11 @@ class SettingsScreen extends ConsumerWidget {
     String getThemeModeLabel(String mode) {
       switch (mode) {
         case 'light':
-          return 'Mode Terang';
+          return context.l10n.settingsThemeLight;
         case 'dark':
-          return 'Mode Gelap';
+          return context.l10n.settingsThemeDark;
         default:
-          return 'Ikuti Sistem';
+          return context.l10n.commonFollowSystem;
       }
     }
 
@@ -232,7 +232,7 @@ class SettingsScreen extends ConsumerWidget {
     return _buildSection(context, [
       ListTile(
         leading: _leadingIcon(context, getThemeModeIcon(settings.themeMode)),
-        title: const Text('Mode Tampilan'),
+        title: Text(context.l10n.settingsThemeModeTitle),
         subtitle: Text(getThemeModeLabel(settings.themeMode)),
         trailing: Icon(
           Icons.chevron_right_rounded,
@@ -240,7 +240,68 @@ class SettingsScreen extends ConsumerWidget {
         ),
         onTap: () => _showThemeModeDialog(context, settings, notifier),
       ),
+      ListTile(
+        leading: _leadingIcon(context, Icons.translate_rounded),
+        title: Text(context.l10n.settingsLanguageTitle),
+        subtitle: Text(_languageLabel(context, settings.languageCode)),
+        trailing: Icon(
+          Icons.chevron_right_rounded,
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
+        ),
+        onTap: () => _showLanguageDialog(context, settings, notifier),
+      ),
     ]);
+  }
+
+  /// Nama bahasa sengaja tidak diterjemahkan, supaya user yang salah pilih
+  /// tetap bisa mengenali bahasanya sendiri.
+  String _languageLabel(BuildContext context, String code) {
+    switch (code) {
+      case 'id':
+        return 'Bahasa Indonesia';
+      case 'en':
+        return 'English';
+      default:
+        return context.l10n.commonFollowSystem;
+    }
+  }
+
+  void _showLanguageDialog(
+    BuildContext context,
+    SettingsState settings,
+    SettingsNotifier notifier,
+  ) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text(context.l10n.settingsLanguageDialogTitle),
+        content: RadioGroup<String>(
+          groupValue: settings.languageCode,
+          onChanged: (selected) {
+            if (selected != null) notifier.setLanguage(selected);
+            Navigator.pop(context);
+          },
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _RadioOption(
+                title: context.l10n.commonFollowSystem,
+                subtitle: context.l10n.settingsLanguageSystemSubtitle,
+                value: 'system',
+              ),
+              const _RadioOption(title: 'Bahasa Indonesia', value: 'id'),
+              const _RadioOption(title: 'English', value: 'en'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(context.l10n.commonClose),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showThemeModeDialog(
@@ -251,29 +312,29 @@ class SettingsScreen extends ConsumerWidget {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Pilih Mode Tampilan'),
+        title: Text(context.l10n.settingsThemeDialogTitle),
         content: RadioGroup<String>(
           groupValue: settings.themeMode,
           onChanged: (selected) {
             if (selected != null) notifier.setThemeMode(selected);
             Navigator.pop(context);
           },
-          child: const Column(
+          child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _ThemeOption(
-                title: 'Ikuti Sistem',
-                subtitle: 'Otomatis sesuai pengaturan perangkat',
+              _RadioOption(
+                title: context.l10n.commonFollowSystem,
+                subtitle: context.l10n.settingsThemeSystemSubtitle,
                 value: 'system',
               ),
-              _ThemeOption(
-                title: 'Mode Terang',
-                subtitle: 'Tampilan cerah untuk siang hari',
+              _RadioOption(
+                title: context.l10n.settingsThemeLight,
+                subtitle: context.l10n.settingsThemeLightSubtitle,
                 value: 'light',
               ),
-              _ThemeOption(
-                title: 'Mode Gelap',
-                subtitle: 'Tampilan gelap untuk malam hari',
+              _RadioOption(
+                title: context.l10n.settingsThemeDark,
+                subtitle: context.l10n.settingsThemeDarkSubtitle,
                 value: 'dark',
               ),
             ],
@@ -282,7 +343,7 @@ class SettingsScreen extends ConsumerWidget {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Tutup'),
+            child: Text(context.l10n.commonClose),
           ),
         ],
       ),
@@ -301,8 +362,10 @@ class SettingsScreen extends ConsumerWidget {
     return _buildSection(context, [
       ListTile(
         leading: _leadingIcon(context, Icons.account_circle_outlined),
-        title: Text(settings.googleAccountEmail ?? 'Belum Login Google'),
-        subtitle: const Text('Untuk backup ke Google Drive'),
+        title: Text(
+          settings.googleAccountEmail ?? context.l10n.settingsGoogleNotLoggedIn,
+        ),
+        subtitle: Text(context.l10n.settingsGoogleLoginSubtitle),
         trailing: settings.googleAccountEmail == null
             ? Icon(Icons.login_rounded, color: colorScheme.primary)
             : Icon(Icons.logout_rounded, color: colorScheme.error),
@@ -320,14 +383,18 @@ class SettingsScreen extends ConsumerWidget {
           try {
             await LoadingDialog.run(
               context,
-              message: 'Keluar dari akun...',
+              message: context.l10n.settingsSigningOut,
               task: () => backupService.signOut(),
             );
             // Refresh settings to update UI with new account status
             ref.invalidate(settingsProvider);
           } catch (e) {
+            if (!context.mounted) return;
             messenger.showSnackBar(
-              AppSnackBar.error(colorScheme, 'Gagal keluar: $e'),
+              AppSnackBar.error(
+                colorScheme,
+                context.l10n.settingsSignOutFailed(e.toString()),
+              ),
             );
           }
         },
@@ -335,16 +402,18 @@ class SettingsScreen extends ConsumerWidget {
       if (settings.googleAccountEmail != null) ...[
         SwitchListTile(
           secondary: _leadingIcon(context, Icons.backup_outlined),
-          title: const Text('Auto Backup'),
-          subtitle: const Text('Backup otomatis ke Google Drive'),
+          title: Text(context.l10n.settingsAutoBackupTitle),
+          subtitle: Text(context.l10n.settingsAutoBackupSubtitle),
           value: settings.autoBackupEnabled,
           onChanged: (value) => notifier.setAutoBackupEnabled(value),
         ),
         ListTile(
           leading: _leadingIcon(context, Icons.cloud_upload_outlined),
-          title: const Text('Backup Data'),
+          title: Text(context.l10n.settingsBackupDataTitle),
           subtitle: Text(
-            'Terakhir: ${_formatBackupDate(settings.lastBackupDate)}',
+            context.l10n.settingsBackupDataSubtitle(
+              _formatBackupDate(context, settings.lastBackupDate),
+            ),
           ),
           onTap: () => _confirmManualBackup(context, ref),
         ),
@@ -355,12 +424,12 @@ class SettingsScreen extends ConsumerWidget {
             container: colorScheme.tertiaryContainer,
             foreground: colorScheme.tertiary,
           ),
-          title: const Text('Restore Data'),
-          subtitle: const Text('Kembalikan data dari Google Drive'),
+          title: Text(context.l10n.settingsRestoreDataTitle),
+          subtitle: Text(context.l10n.settingsRestoreDataSubtitle),
           onTap: () => _showRestoreDialog(context, ref),
         ),
       ],
-    ], title: 'Backup & Data');
+    ], title: context.l10n.settingsBackupSectionTitle);
   }
 
   /// Sign in to Google and restore the most recent backup.
@@ -381,7 +450,7 @@ class SettingsScreen extends ConsumerWidget {
       final result =
           await LoadingDialog.run<({String? latestId, bool hasLocalData})>(
             context,
-            message: 'Menghubungkan ke Google...',
+            message: context.l10n.settingsConnectingGoogle,
             task: () async {
               await backupService.signIn();
 
@@ -397,10 +466,11 @@ class SettingsScreen extends ConsumerWidget {
       // 2. No backup available → login only.
       if (result.latestId == null) {
         ref.invalidate(settingsProvider);
+        if (!context.mounted) return;
         messenger.showSnackBar(
           AppSnackBar.success(
             colorScheme,
-            'Login berhasil. Belum ada backup untuk dipulihkan.',
+            context.l10n.settingsLoginSuccessNoBackup,
           ),
         );
         return;
@@ -412,10 +482,11 @@ class SettingsScreen extends ConsumerWidget {
         final confirmed = await _confirmRestoreOnLogin(context);
         if (confirmed != true) {
           ref.invalidate(settingsProvider);
+          if (!context.mounted) return;
           messenger.showSnackBar(
             AppSnackBar.success(
               colorScheme,
-              'Login berhasil. Data lokal dipertahankan.',
+              context.l10n.settingsLoginSuccessKeptLocal,
             ),
           );
           return;
@@ -426,7 +497,7 @@ class SettingsScreen extends ConsumerWidget {
       if (!context.mounted) return;
       await LoadingDialog.run(
         context,
-        message: 'Memulihkan data backup terbaru...',
+        message: context.l10n.settingsRestoringLatest,
         task: () => backupService.restore(result.latestId!),
       );
 
@@ -434,17 +505,21 @@ class SettingsScreen extends ConsumerWidget {
       ref.invalidate(todayPrayersProvider);
       ref.invalidate(prayerTimesProvider);
 
+      if (!context.mounted) return;
       messenger.showSnackBar(
         AppSnackBar.success(
           colorScheme,
-          'Login berhasil & data backup terbaru dipulihkan!',
+          context.l10n.settingsLoginRestoredSuccess,
         ),
       );
     } catch (e) {
       // Login may have succeeded even if a later step failed, so refresh the
       // account status regardless. Sign-in cancellation also lands here.
       ref.invalidate(settingsProvider);
-      messenger.showSnackBar(AppSnackBar.error(colorScheme, 'Gagal masuk: $e'));
+      if (!context.mounted) return;
+      messenger.showSnackBar(
+        AppSnackBar.error(colorScheme, context.l10n.settingsSignInFailed(e.toString())),
+      );
     }
   }
 
@@ -456,15 +531,12 @@ class SettingsScreen extends ConsumerWidget {
       context: context,
       useRootNavigator: true,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Pulihkan Data Backup?'),
-        content: const Text(
-          'Login berhasil. Kamu sudah punya data di perangkat ini. '
-          'Memulihkan backup terbaru akan MENIMPA data tersebut. Lanjutkan?',
-        ),
+        title: Text(context.l10n.settingsRestoreOnLoginTitle),
+        content: Text(context.l10n.settingsRestoreOnLoginBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Pertahankan Data'),
+            child: Text(context.l10n.settingsKeepLocalData),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -472,7 +544,7 @@ class SettingsScreen extends ConsumerWidget {
               foregroundColor: colorScheme.onError,
             ),
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Pulihkan'),
+            child: Text(context.l10n.settingsRestoreCta),
           ),
         ],
       ),
@@ -484,16 +556,16 @@ class SettingsScreen extends ConsumerWidget {
       context: context,
       useRootNavigator: true,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Backup Sekarang?'),
-        content: const Text('Data kamu akan disimpan ke Google Drive.'),
+        title: Text(context.l10n.settingsBackupNowTitle),
+        content: Text(context.l10n.settingsBackupNowBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('Batal'),
+            child: Text(context.l10n.commonCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('Backup'),
+            child: Text(context.l10n.settingsBackupCta),
           ),
         ],
       ),
@@ -508,11 +580,12 @@ class SettingsScreen extends ConsumerWidget {
     final notifier = ref.read(settingsProvider.notifier);
     final messenger = ScaffoldMessenger.of(context);
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
 
     try {
       await LoadingDialog.run(
         context,
-        message: 'Sedang melakukan backup...',
+        message: l10n.settingsBackingUp,
         task: () async {
           await backupService.init();
           await backupService.backup();
@@ -521,11 +594,11 @@ class SettingsScreen extends ConsumerWidget {
       );
 
       messenger.showSnackBar(
-        AppSnackBar.success(colorScheme, 'Backup berhasil!'),
+        AppSnackBar.success(colorScheme, l10n.settingsBackupSuccess),
       );
     } catch (e) {
       messenger.showSnackBar(
-        AppSnackBar.error(colorScheme, 'Gagal backup: $e'),
+        AppSnackBar.error(colorScheme, l10n.settingsBackupFailed(e.toString())),
       );
     }
   }
@@ -535,6 +608,7 @@ class SettingsScreen extends ConsumerWidget {
     // Capture references before any async operation
     final scaffoldMessenger = ScaffoldMessenger.of(context);
     final router = GoRouter.of(context);
+    final l10n = context.l10n;
 
     await backupService.init();
     if (!context.mounted) return;
@@ -542,7 +616,7 @@ class SettingsScreen extends ConsumerWidget {
     try {
       final List<drive.File> backups = await LoadingDialog.run(
         context,
-        message: 'Memuat daftar backup...',
+        message: l10n.settingsLoadingBackupList,
         task: () => backupService.listBackups(),
       );
 
@@ -565,12 +639,12 @@ class SettingsScreen extends ConsumerWidget {
                   horizontal: 24,
                   vertical: 24,
                 ),
-                title: const Text('Pilih Backup untuk Dipulihkan'),
+                title: Text(l10n.settingsChooseBackupTitle),
                 content: SizedBox(
                   width: double.maxFinite,
                   child: items.isEmpty
                       ? Text(
-                          'Belum ada backup tersimpan.',
+                          l10n.settingsNoBackupsSaved,
                           style: TextStyle(color: colorScheme.onSurfaceVariant),
                         )
                       : ListView.builder(
@@ -582,9 +656,9 @@ class SettingsScreen extends ConsumerWidget {
                             final dateLabel = createdLocal != null
                                 ? DateFormat(
                                     'd MMM yyyy, HH:mm',
-                                    'id_ID',
+                                    context.localeTag,
                                   ).format(createdLocal)
-                                : 'Tanggal tidak diketahui';
+                                : l10n.settingsUnknownDate;
                             final isLatest = index == 0;
 
                             return ListTile(
@@ -615,7 +689,7 @@ class SettingsScreen extends ConsumerWidget {
                                             ),
                                           ),
                                           child: Text(
-                                            'Terbaru',
+                                            l10n.settingsLatestBadge,
                                             style: Theme.of(context)
                                                 .textTheme
                                                 .labelSmall
@@ -634,7 +708,7 @@ class SettingsScreen extends ConsumerWidget {
                                   color: colorScheme.error,
                                 ),
                                 visualDensity: VisualDensity.compact,
-                                tooltip: 'Hapus backup',
+                                tooltip: l10n.settingsDeleteBackupTooltip,
                                 onPressed: () async {
                                   final fileId = file.id;
                                   if (fileId == null) return;
@@ -643,16 +717,16 @@ class SettingsScreen extends ConsumerWidget {
                                     context: statefulContext,
                                     useRootNavigator: true,
                                     builder: (confirmContext) => AlertDialog(
-                                      title: const Text('Hapus Backup?'),
+                                      title: Text(l10n.settingsDeleteBackupTitle),
                                       content: Text(
-                                        'Backup $dateLabel akan dihapus permanen dari Google Drive.',
+                                        l10n.settingsDeleteBackupBody(dateLabel),
                                       ),
                                       actions: [
                                         TextButton(
                                           onPressed: () => Navigator.of(
                                             confirmContext,
                                           ).pop(false),
-                                          child: const Text('Batal'),
+                                          child: Text(l10n.commonCancel),
                                         ),
                                         FilledButton(
                                           style: FilledButton.styleFrom(
@@ -663,7 +737,7 @@ class SettingsScreen extends ConsumerWidget {
                                           onPressed: () => Navigator.of(
                                             confirmContext,
                                           ).pop(true),
-                                          child: const Text('Hapus'),
+                                          child: Text(l10n.settingsDeleteCta),
                                         ),
                                       ],
                                     ),
@@ -677,14 +751,14 @@ class SettingsScreen extends ConsumerWidget {
                                     scaffoldMessenger.showSnackBar(
                                       AppSnackBar.info(
                                         colorScheme,
-                                        'Backup dihapus.',
+                                        l10n.settingsBackupDeleted,
                                       ),
                                     );
                                   } catch (e) {
                                     scaffoldMessenger.showSnackBar(
                                       AppSnackBar.error(
                                         colorScheme,
-                                        'Gagal menghapus: $e',
+                                        l10n.settingsDeleteFailed(e.toString()),
                                       ),
                                     );
                                   }
@@ -716,7 +790,7 @@ class SettingsScreen extends ConsumerWidget {
                   TextButton(
                     onPressed: () =>
                         Navigator.of(context, rootNavigator: true).pop(),
-                    child: const Text('Batal'),
+                    child: Text(l10n.commonCancel),
                   ),
                 ],
               );
@@ -728,7 +802,7 @@ class SettingsScreen extends ConsumerWidget {
       scaffoldMessenger.showSnackBar(
         AppSnackBar.error(
           Theme.of(context).colorScheme,
-          'Gagal mengambil list backup: $e',
+          l10n.settingsListBackupFailed(e.toString()),
         ),
       );
     }
@@ -746,14 +820,12 @@ class SettingsScreen extends ConsumerWidget {
       context: context,
       useRootNavigator: true,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Restore Data?'),
-        content: const Text(
-          'PERINGATAN: Tindakan ini akan MENIMPA data yang ada sekarang dengan data dari backup. Lanjutkan?',
-        ),
+        title: Text(context.l10n.settingsRestoreConfirmTitle),
+        content: Text(context.l10n.settingsRestoreConfirmBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
-            child: const Text('Batal'),
+            child: Text(context.l10n.commonCancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -763,13 +835,14 @@ class SettingsScreen extends ConsumerWidget {
             onPressed: () async {
               Navigator.of(context, rootNavigator: true).pop();
 
-              // Capture colors before async operations
+              // Capture colors and text before async operations
               final colorScheme = Theme.of(context).colorScheme;
+              final l10n = context.l10n;
 
               try {
                 await LoadingDialog.run(
                   context,
-                  message: 'Sedang memulihkan data...',
+                  message: l10n.settingsRestoringData,
                   task: () => backupService.restore(fileId),
                 );
 
@@ -778,18 +851,18 @@ class SettingsScreen extends ConsumerWidget {
                 ref.invalidate(prayerTimesProvider);
 
                 scaffoldMessenger.showSnackBar(
-                  AppSnackBar.success(colorScheme, 'Data berhasil di-restore!'),
+                  AppSnackBar.success(colorScheme, l10n.settingsRestoreSuccess),
                 );
 
                 // Navigate using stored router
                 router.go(AppRoutes.home);
               } catch (e) {
                 scaffoldMessenger.showSnackBar(
-                  AppSnackBar.error(colorScheme, 'Gagal restore: $e'),
+                  AppSnackBar.error(colorScheme, l10n.settingsRestoreFailed(e.toString())),
                 );
               }
             },
-            child: const Text('Restore'),
+            child: Text(context.l10n.settingsRestoreCta),
           ),
         ],
       ),
@@ -811,7 +884,7 @@ class SettingsScreen extends ConsumerWidget {
           container: colorScheme.surfaceContainerHighest,
           foreground: colorScheme.onSurfaceVariant,
         ),
-        title: const Text('Versi Aplikasi'),
+        title: Text(context.l10n.settingsAppVersionTitle),
         subtitle: Text(
           packageInfo.when(
             data: (info) => '${info.version} (${info.buildNumber})',
@@ -829,10 +902,11 @@ class SettingsScreen extends ConsumerWidget {
           container: colorScheme.errorContainer,
           foreground: colorScheme.error,
         ),
-        title: Text('Reset Data', style: TextStyle(color: colorScheme.error)),
-        subtitle: const Text(
-          'Hapus data di perangkat (backup Drive tetap aman)',
+        title: Text(
+          context.l10n.settingsResetDataTitle,
+          style: TextStyle(color: colorScheme.error),
         ),
+        subtitle: Text(context.l10n.settingsResetDataSubtitle),
         onTap: () => _showResetConfirmDialog(context, ref),
       ),
     ]);
@@ -850,21 +924,17 @@ class SettingsScreen extends ConsumerWidget {
           borderRadius: BorderRadius.circular(20.0),
         ),
         title: Text(
-          'Reset Data?',
+          context.l10n.settingsResetConfirmTitle,
           style: TextStyle(
             color: Theme.of(context).colorScheme.secondary,
             fontWeight: FontWeight.bold,
           ),
         ),
-        content: Text(
-          'Ini akan menghapus SEMUA data solat dan setting di perangkat ini. '
-          'Backup di Google Drive TIDAK ikut terhapus, jadi data masih bisa '
-          'dipulihkan lewat Restore. Tindakan ini tidak bisa dibatalkan.',
-        ),
+        content: Text(context.l10n.settingsResetConfirmBody),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Batal'),
+            child: Text(context.l10n.commonCancel),
           ),
           FilledButton(
             style: FilledButton.styleFrom(
@@ -875,7 +945,7 @@ class SettingsScreen extends ConsumerWidget {
               Navigator.pop(context);
               await _resetData(context, ref);
             },
-            child: const Text('Reset'),
+            child: Text(context.l10n.settingsResetCta),
           ),
         ],
       ),
@@ -886,12 +956,13 @@ class SettingsScreen extends ConsumerWidget {
     if (!context.mounted) return;
     final messenger = ScaffoldMessenger.of(context);
     final colorScheme = Theme.of(context).colorScheme;
+    final l10n = context.l10n;
 
     try {
       // Blocking progress for the destructive op (matches backup/restore).
       await LoadingDialog.run(
         context,
-        message: 'Mereset data...',
+        message: l10n.settingsResetting,
         task: () async {
           await ref.read(databaseServiceProvider).deleteAllData();
           await ref.read(preferencesServiceProvider).clearAll();
@@ -903,29 +974,26 @@ class SettingsScreen extends ConsumerWidget {
       ref.invalidate(prayerTimesProvider);
 
       messenger.showSnackBar(
-        AppSnackBar.success(colorScheme, 'Data berhasil direset'),
+        AppSnackBar.success(colorScheme, l10n.settingsResetSuccess),
       );
       if (context.mounted) context.go(AppRoutes.home);
     } catch (e) {
       messenger.showSnackBar(
-        AppSnackBar.error(colorScheme, 'Gagal reset data: $e'),
+        AppSnackBar.error(colorScheme, l10n.settingsResetFailed(e.toString())),
       );
     }
   }
 }
 
-/// Single-select theme option backed by the accessible M3 [RadioListTile].
+/// Single-select radio option backed by the accessible M3 [RadioListTile].
 /// Selection state is announced to screen readers automatically (unlike the
 /// previous check-icon approach). The enclosing [RadioGroup] handles changes.
-class _ThemeOption extends StatelessWidget {
-  const _ThemeOption({
-    required this.title,
-    required this.subtitle,
-    required this.value,
-  });
+/// Used by both the theme and language dialogs.
+class _RadioOption extends StatelessWidget {
+  const _RadioOption({required this.title, this.subtitle, required this.value});
 
   final String title;
-  final String subtitle;
+  final String? subtitle;
   final String value;
 
   @override
@@ -934,7 +1002,7 @@ class _ThemeOption extends StatelessWidget {
       contentPadding: EdgeInsets.zero,
       value: value,
       title: Text(title),
-      subtitle: Text(subtitle),
+      subtitle: subtitle == null ? null : Text(subtitle!),
     );
   }
 }
@@ -1017,10 +1085,9 @@ class _CitySearchDialogState extends ConsumerState<_CitySearchDialog> {
     );
 
     if (!mounted) return;
+    final message = context.l10n.settingsCityChanged(city.name);
     Navigator.pop(context);
-    messenger.showSnackBar(
-      AppSnackBar.success(colorScheme, 'Kota diubah ke ${city.name}'),
-    );
+    messenger.showSnackBar(AppSnackBar.success(colorScheme, message));
   }
 
   @override
@@ -1035,14 +1102,17 @@ class _CitySearchDialogState extends ConsumerState<_CitySearchDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('Cari Kota', style: Theme.of(context).textTheme.titleLarge),
+            Text(
+              context.l10n.settingsCitySearchTitle,
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
             const SizedBox(height: 20),
             TextField(
               controller: _searchController,
               keyboardType: TextInputType.text,
               textInputAction: TextInputAction.search,
               decoration: InputDecoration(
-                hintText: 'Masukkan nama kota (min. $_minQueryLength huruf)',
+                hintText: context.l10n.settingsCitySearchHint(_minQueryLength),
                 filled: true,
                 fillColor: colorScheme.surfaceContainerHighest,
                 border: OutlineInputBorder(
@@ -1062,7 +1132,7 @@ class _CitySearchDialogState extends ConsumerState<_CitySearchDialog> {
                 ),
                 suffixIcon: IconButton(
                   icon: Icon(Icons.search_rounded, color: colorScheme.primary),
-                  tooltip: 'Cari',
+                  tooltip: context.l10n.settingsCitySearchTooltip,
                   onPressed: _isLoading
                       ? null
                       : () => _searchCities(_searchController.text),
@@ -1079,12 +1149,12 @@ class _CitySearchDialogState extends ConsumerState<_CitySearchDialog> {
               Text(_error!, style: TextStyle(color: colorScheme.error))
             else if (query.length < _minQueryLength && query.isNotEmpty)
               Text(
-                'Ketik minimal $_minQueryLength huruf.',
+                context.l10n.settingsCitySearchMinChars(_minQueryLength),
                 style: TextStyle(color: colorScheme.onSurfaceVariant),
               )
             else if (_cities.isEmpty && query.isNotEmpty)
               Text(
-                'Kota tidak ditemukan',
+                context.l10n.onboardingCityNotFound,
                 style: TextStyle(color: colorScheme.onSurfaceVariant),
               )
             else

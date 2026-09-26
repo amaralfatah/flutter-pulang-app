@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../l10n/app_localizations.dart';
+import '../l10n/locale_resolver.dart';
 import '../providers/providers.dart';
 import '../services/services.dart';
+import 'extensions/context_extensions.dart';
 import 'router.dart';
 import 'theme/app_theme.dart';
 
@@ -73,11 +76,17 @@ class _PulangAppState extends ConsumerState<PulangApp> {
     final themeMode = _getThemeMode(settings.themeMode);
 
     return MaterialApp.router(
-      title: 'Pulang - Presensi Solat',
+      onGenerateTitle: (context) => context.l10n.appTitle,
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
       darkTheme: AppTheme.dark,
       themeMode: themeMode,
+      locale: ref.watch(localeProvider),
+      supportedLocales: AppLocalizations.supportedLocales,
+      localizationsDelegates: AppLocalizations.localizationsDelegates,
+      localeResolutionCallback: (deviceLocale, _) => Locale(
+        resolveLanguageCode('system', deviceLocale ?? const Locale('id')),
+      ),
       routerConfig: router,
     );
   }

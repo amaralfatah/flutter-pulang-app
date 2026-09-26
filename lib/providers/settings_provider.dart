@@ -1,3 +1,5 @@
+import 'dart:ui' show Locale;
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
@@ -26,6 +28,7 @@ class SettingsState {
   final String? lastBackupDate;
   final String? googleAccountEmail;
   final String themeMode; // 'system', 'light', 'dark'
+  final String languageCode; // 'system', 'id', 'en'
   final bool isLoading;
 
   const SettingsState({
@@ -36,6 +39,7 @@ class SettingsState {
     this.lastBackupDate,
     this.googleAccountEmail,
     this.themeMode = 'system',
+    this.languageCode = 'system',
     this.isLoading = false,
   });
 
@@ -50,6 +54,7 @@ class SettingsState {
     // clearing needs its own flag.
     bool clearGoogleAccountEmail = false,
     String? themeMode,
+    String? languageCode,
     bool? isLoading,
   }) {
     return SettingsState(
@@ -62,6 +67,7 @@ class SettingsState {
           ? null
           : googleAccountEmail ?? this.googleAccountEmail,
       themeMode: themeMode ?? this.themeMode,
+      languageCode: languageCode ?? this.languageCode,
       isLoading: isLoading ?? this.isLoading,
     );
   }
@@ -98,6 +104,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
     final googleAccountEmail = await _preferencesService
         .getGoogleAccountEmail();
     final themeMode = await _preferencesService.getThemeMode();
+    final languageCode = await _preferencesService.getLanguageCode();
 
     state = SettingsState(
       cityId: cityId,
@@ -107,6 +114,7 @@ class SettingsNotifier extends Notifier<SettingsState> {
       lastBackupDate: lastBackupDate,
       googleAccountEmail: googleAccountEmail,
       themeMode: themeMode,
+      languageCode: languageCode,
       isLoading: false,
     );
   }
@@ -172,6 +180,20 @@ class SettingsNotifier extends Notifier<SettingsState> {
     state = state.copyWith(themeMode: mode);
   }
 
+  /// Set language ('system', 'id', 'en') and re-schedule today's
+  /// notifications so their text follows the new language.
+  Future<void> setLanguage(String code) async {
+    await _preferencesService.setLanguageCode(code);
+    state = state.copyWith(languageCode: code);
+
+    if (state.notificationEnabled) {
+      final prayerTime = ref.read(prayerTimesProvider).prayerTime;
+      if (prayerTime != null) {
+        await _notificationService.schedulePrayerNotifications(prayerTime);
+      }
+    }
+  }
+
   /// Refresh settings
   Future<void> refresh() => _loadSettings();
 }
@@ -180,6 +202,12 @@ class SettingsNotifier extends Notifier<SettingsState> {
 final settingsProvider = NotifierProvider<SettingsNotifier, SettingsState>(
   SettingsNotifier.new,
 );
+
+/// Locale override for MaterialApp; null = follow the device.
+final localeProvider = Provider<Locale?>((ref) {
+  final code = ref.watch(settingsProvider.select((s) => s.languageCode));
+  return code == 'system' ? null : Locale(code);
+});
 
 /// True when prayers are recorded but Google Drive backup isn't connected
 /// (never signed in, or the grant was lost) — the data is at risk.

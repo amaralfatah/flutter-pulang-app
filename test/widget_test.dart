@@ -13,7 +13,7 @@ import 'package:pulang/app/app.dart';
 
 void main() {
   setUpAll(() async {
-    await initializeDateFormatting('id_ID', null);
+    await initializeDateFormatting();
   });
 
   testWidgets('App should build without errors', (WidgetTester tester) async {

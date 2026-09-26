@@ -9,8 +9,8 @@ import 'services/services.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize Indonesian date formatting
-  await initializeDateFormatting('id_ID', null);
+  // Initialize date formatting for all supported locales
+  await initializeDateFormatting();
 
   // Initialize Notification Service
   await NotificationService().init();

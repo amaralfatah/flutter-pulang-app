@@ -6,6 +6,7 @@ import 'package:intl/intl.dart';
 import 'package:table_calendar/table_calendar.dart';
 
 import '../../app/extensions/color_scheme_extensions.dart';
+import '../../app/extensions/context_extensions.dart';
 import '../../models/models.dart';
 import '../../providers/providers.dart';
 import '../../widgets/shared/app_snackbar.dart';
@@ -68,16 +69,16 @@ class _CalendarViewState extends ConsumerState<CalendarView> {
               ref.read(calendarProvider.notifier).onPageChanged(focusedDay);
             },
             calendarFormat: _format,
-            availableCalendarFormats: const {
-              CalendarFormat.week: 'Minggu',
-              CalendarFormat.month: 'Bulan',
+            availableCalendarFormats: {
+              CalendarFormat.week: context.l10n.calendarFormatWeek,
+              CalendarFormat.month: context.l10n.calendarFormatMonth,
             },
             // Hanya swipe horizontal (ganti bulan/minggu). Swipe vertikal
             // dibiarkan lewat ke ListView halaman supaya scroll ke bawah tetap
             // enak — makanya buka/tutup lewat handle, bukan gestur.
             availableGestures: AvailableGestures.horizontalSwipe,
             startingDayOfWeek: StartingDayOfWeek.monday,
-            locale: 'id_ID',
+            locale: context.localeTag,
             rowHeight: 52,
             daysOfWeekHeight: 40,
 
@@ -225,8 +226,8 @@ class _CalendarViewState extends ConsumerState<CalendarView> {
           child: Semantics(
             button: true,
             label: isMonth
-                ? 'Kuncupkan ke tampilan minggu'
-                : 'Perluas ke tampilan bulan',
+                ? context.l10n.calendarCollapseToWeek
+                : context.l10n.calendarExpandToMonth,
             // Target ketuk dibatasi 64px di tengah: InkWell selebar Card akan
             // memercikkan ripple melewati sudut membulatnya.
             child: InkWell(
@@ -259,9 +260,9 @@ class _CalendarViewState extends ConsumerState<CalendarView> {
   Widget _buildLegend(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final items = [
-      (colorScheme.statusOnTime, 'Tepat waktu'),
-      (colorScheme.statusLate, 'Terlambat'),
-      (colorScheme.statusMissed, 'Terlewat'),
+      (colorScheme.statusOnTime, context.l10n.calendarLegendOnTime),
+      (colorScheme.statusLate, context.l10n.calendarLegendLate),
+      (colorScheme.statusMissed, context.l10n.calendarLegendMissed),
     ];
 
     return Padding(
@@ -313,7 +314,7 @@ class _CalendarViewState extends ConsumerState<CalendarView> {
 
     return Semantics(
       label: hasAnyStatus
-          ? '${date.day}, $recordedCount dari 5 solat tercatat'
+          ? context.l10n.calendarDaySemanticsRecorded(date.day, recordedCount)
           : '${date.day}',
       child: Container(
         margin: const EdgeInsets.all(2),
@@ -382,7 +383,7 @@ class _CalendarViewState extends ConsumerState<CalendarView> {
     final selectedDay = state.selectedDay!;
     final formattedDate = DateFormat(
       'EEEE, d MMMM yyyy',
-      'id_ID',
+      context.localeTag,
     ).format(selectedDay);
     final prayers = state.selectedDayPrayers;
     // Count all recorded prayers (onTime, late, or missed)
@@ -460,14 +461,14 @@ class _CalendarViewState extends ConsumerState<CalendarView> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
-              '$missing waktu belum tercatat',
+              context.l10n.calendarIncompleteTitle(missing),
               style: Theme.of(
                 context,
               ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 4),
             Text(
-              'Aplikasi tidak menebak — beri tahu apa yang terjadi, atau isi satu-satu lewat daftar di bawah.',
+              context.l10n.calendarIncompleteBody,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: colorScheme.onSurfaceVariant,
               ),
@@ -485,7 +486,7 @@ class _CalendarViewState extends ConsumerState<CalendarView> {
                       PrayerStatus.late,
                     ),
                     icon: const Icon(Icons.check_rounded, size: 18),
-                    label: const Text('Solat'),
+                    label: Text(context.l10n.calendarMarkPrayed),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -499,7 +500,7 @@ class _CalendarViewState extends ConsumerState<CalendarView> {
                       PrayerStatus.missed,
                     ),
                     icon: const Icon(Icons.close_rounded, size: 18),
-                    label: const Text('Terlewat'),
+                    label: Text(context.l10n.calendarMarkMissed),
                     style: OutlinedButton.styleFrom(
                       foregroundColor: colorScheme.error,
                     ),
@@ -529,24 +530,28 @@ class _CalendarViewState extends ConsumerState<CalendarView> {
     final isMissed = status == PrayerStatus.missed;
     final formatted = DateFormat(
       'EEEE, d MMMM yyyy',
-      'id_ID',
+      context.localeTag,
     ).format(selectedDay);
     final dateStr = _formatDateKey(selectedDay);
+    final l10n = context.l10n;
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: Text(isMissed ? 'Tandai Terlewat?' : 'Tandai Sudah Solat?'),
+        title: Text(
+          isMissed
+              ? l10n.calendarConfirmMissedTitle
+              : l10n.calendarConfirmPrayedTitle,
+        ),
         content: Text(
           isMissed
-              ? '$missing waktu pada $formatted akan dicatat terlewat dan '
-                    'menambah hutang qadha sebanyak $missing.'
-              : '$missing waktu pada $formatted akan dicatat sudah dikerjakan.',
+              ? l10n.calendarConfirmMissedBody(missing, formatted)
+              : l10n.calendarConfirmPrayedBody(missing, formatted),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Batal'),
+            child: Text(l10n.commonCancel),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(dialogContext, true),
@@ -556,7 +561,11 @@ class _CalendarViewState extends ConsumerState<CalendarView> {
                     foregroundColor: colorScheme.onError,
                   )
                 : null,
-            child: Text(isMissed ? 'Ya, terlewat' : 'Ya, sudah'),
+            child: Text(
+              isMissed
+                  ? l10n.calendarConfirmMissedCta
+                  : l10n.calendarConfirmPrayedCta,
+            ),
           ),
         ],
       ),
@@ -570,13 +579,13 @@ class _CalendarViewState extends ConsumerState<CalendarView> {
       SnackBar(
         content: Text(
           isMissed
-              ? '$formatted dicatat terlewat.'
-              : '$formatted dicatat sudah dikerjakan.',
+              ? l10n.calendarMarkedMissedSnackbar(formatted)
+              : l10n.calendarMarkedPrayedSnackbar(formatted),
         ),
         // Lihat catatan di home_screen: tanpa ini snackbar tidak hilang sendiri.
         persist: false,
         action: SnackBarAction(
-          label: 'Urungkan',
+          label: l10n.commonUndo,
           onPressed: () => notifier.undoConfirmDay(ids),
         ),
       ),
@@ -598,6 +607,7 @@ class _CalendarViewState extends ConsumerState<CalendarView> {
       colorScheme: colorScheme,
     );
     final text = _getStatusText(
+      context,
       totalRecordedCount: totalRecordedCount,
       completedCount: completedCount,
     );
@@ -673,7 +683,7 @@ class _CalendarViewState extends ConsumerState<CalendarView> {
     final colorScheme = Theme.of(context).colorScheme;
     final formattedDate = DateFormat(
       'EEEE, d MMMM yyyy',
-      'id_ID',
+      context.localeTag,
     ).format(selectedDay);
 
     await CheckInBottomSheet.show(
@@ -692,7 +702,10 @@ class _CalendarViewState extends ConsumerState<CalendarView> {
               messenger.showSnackBar(
                 AppSnackBar.info(
                   colorScheme,
-                  'Catatan ${prayerName.displayName} $formattedDate dihapus.',
+                  context.l10n.calendarDeletedSnackbar(
+                    prayerName.label(context.l10n),
+                    formattedDate,
+                  ),
                 ),
               );
             },
@@ -745,13 +758,14 @@ class _CalendarViewState extends ConsumerState<CalendarView> {
     );
   }
 
-  String _getStatusText({
+  String _getStatusText(
+    BuildContext context, {
     required int totalRecordedCount,
     required int completedCount,
   }) {
-    if (completedCount == 5) return '5/5 Sempurna';
-    if (totalRecordedCount == 0) return 'Belum ada data';
-    return '$totalRecordedCount/5 Tercatat';
+    if (completedCount == 5) return context.l10n.calendarStatusPerfect;
+    if (totalRecordedCount == 0) return context.l10n.calendarStatusEmpty;
+    return context.l10n.calendarStatusRecorded(totalRecordedCount);
   }
 }
 

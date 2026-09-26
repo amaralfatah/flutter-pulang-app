@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_qiblah/flutter_qiblah.dart';
 
 import '../../app/extensions/context_extensions.dart';
+import '../../l10n/app_localizations.dart';
 import '../../utils/qibla_utils.dart';
 
 /// Visual compass: a rose that rotates with the device heading, a needle that
@@ -108,7 +109,9 @@ class _StatusPill extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Text(
-            aligned ? 'Anda menghadap kiblat' : 'Putar perangkat ke arah panah',
+            aligned
+                ? context.l10n.qiblaFacingQibla
+                : context.l10n.qiblaTurnToArrow,
             style: context.textTheme.labelLarge?.copyWith(
               color: foreground,
               fontWeight: FontWeight.w600,
@@ -139,10 +142,11 @@ class _CompassDial extends StatelessWidget {
     final needleColor = aligned ? colorScheme.primary : colorScheme.tertiary;
 
     return Semantics(
-      label: 'Kompas kiblat',
-      value:
-          'Arah kiblat ${QiblaUtils.formatDegrees(direction.offset)}, '
-          '${aligned ? 'Anda menghadap kiblat' : 'belum sejajar, putar perangkat ke arah panah'}',
+      label: context.l10n.qiblaCompassSemantics,
+      value: context.l10n.qiblaDirectionSemantics(
+        QiblaUtils.formatDegrees(direction.offset),
+        aligned ? context.l10n.qiblaFacingQibla : context.l10n.qiblaNotAlignedSemantics,
+      ),
       liveRegion: true,
       child: SizedBox(
         width: diameter,
@@ -199,6 +203,7 @@ class _CompassDial extends StatelessWidget {
                   northColor: colorScheme.error,
                   textStyle: context.textTheme.labelMedium,
                   northTextStyle: context.textTheme.titleMedium,
+                  l10n: context.l10n,
                 ),
               ),
             ),
@@ -273,7 +278,7 @@ class _QiblaInfoCard extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  'Arah kiblat',
+                  context.l10n.qiblaDirectionLabel,
                   style: context.textTheme.labelMedium?.copyWith(
                     color: colorScheme.onSurfaceVariant,
                   ),
@@ -281,7 +286,7 @@ class _QiblaInfoCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   '${QiblaUtils.formatDegrees(direction.offset)} '
-                  '${QiblaUtils.cardinalName(cardinal)}',
+                  '${QiblaUtils.cardinalName(cardinal, context.l10n)}',
                   style: context.textTheme.titleLarge?.copyWith(
                     fontWeight: FontWeight.w600,
                     fontFeatures: const [FontFeature.tabularFigures()],
@@ -305,6 +310,7 @@ class _CompassRosePainter extends CustomPainter {
     required this.northColor,
     required this.textStyle,
     required this.northTextStyle,
+    required this.l10n,
   });
 
   final Color minorTick;
@@ -313,8 +319,11 @@ class _CompassRosePainter extends CustomPainter {
   final Color northColor;
   final TextStyle? textStyle;
   final TextStyle? northTextStyle;
+  final AppLocalizations l10n;
 
-  static const _cardinals = {
+  /// Codes at each 45° point, kept stable regardless of locale. The dial
+  /// label shown for each is localized via [AppLocalizations.qiblaDialLabel].
+  static const _cardinalCodes = {
     0: 'U',
     45: 'TL',
     90: 'T',
@@ -350,12 +359,13 @@ class _CompassRosePainter extends CustomPainter {
       canvas.drawLine(inner, outer, paint);
     }
 
-    _cardinals.forEach((deg, label) {
+    _cardinalCodes.forEach((deg, code) {
       final isPrimary = deg % 90 == 0;
       final style = (isPrimary ? northTextStyle : textStyle)?.copyWith(
         color: deg == 0 ? northColor : cardinalColor,
         fontWeight: isPrimary ? FontWeight.w700 : FontWeight.w500,
       );
+      final label = l10n.qiblaDialLabel(code);
       _drawLabel(canvas, center, radius, deg.toDouble(), label, style);
     });
   }
@@ -386,7 +396,8 @@ class _CompassRosePainter extends CustomPainter {
       oldDelegate.minorTick != minorTick ||
       oldDelegate.majorTick != majorTick ||
       oldDelegate.cardinalColor != cardinalColor ||
-      oldDelegate.northColor != northColor;
+      oldDelegate.northColor != northColor ||
+      oldDelegate.l10n != l10n;
 }
 
 /// Draws a slim arrow pointing up from the centre, with a short muted tail

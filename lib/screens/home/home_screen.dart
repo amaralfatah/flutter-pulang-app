@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 
+import '../../app/extensions/context_extensions.dart';
 import '../../app/router.dart';
 import '../../models/models.dart';
 import '../../providers/providers.dart';
@@ -34,7 +35,7 @@ class HomeScreen extends ConsumerWidget {
           IconButton(
             icon: const Icon(Icons.explore_outlined),
             onPressed: () => context.push(AppRoutes.qibla),
-            tooltip: 'Kiblat',
+            tooltip: context.l10n.navQibla,
           ),
           IconButton(
             // Sesi Google kadang lepas sendiri; tanda ini mengingatkan bahwa
@@ -52,8 +53,8 @@ class HomeScreen extends ConsumerWidget {
             ),
             onPressed: () => context.push(AppRoutes.settings),
             tooltip: showBackupWarning
-                ? 'Pengaturan — backup Google belum terhubung'
-                : 'Pengaturan',
+                ? context.l10n.homeSettingsBackupWarningTooltip
+                : context.l10n.navSettings,
           ),
         ],
       ),
@@ -85,7 +86,7 @@ class HomeScreen extends ConsumerWidget {
               child: Row(
                 children: [
                   Text(
-                    'Jadwal Hari Ini',
+                    context.l10n.homeScheduleTitle,
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -93,8 +94,9 @@ class HomeScreen extends ConsumerWidget {
                   const Spacer(),
                   // Progress Badge - tonal pill, labelled for screen readers.
                   Semantics(
-                    label:
-                        '${todayPrayersState.completedCount} dari 5 solat selesai',
+                    label: context.l10n.homeProgressSemantics(
+                      todayPrayersState.completedCount,
+                    ),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 12,
@@ -147,7 +149,7 @@ class HomeScreen extends ConsumerWidget {
   Widget _buildHeader(BuildContext context, WidgetRef ref) {
     final settings = ref.watch(settingsProvider);
     final now = DateTime.now();
-    final dateStr = DateFormat('EEEE, d MMMM yyyy', 'id_ID').format(now);
+    final dateStr = DateFormat('EEEE, d MMMM yyyy', context.localeTag).format(now);
 
     // The location line doubles as the way to change it, so it stays tappable
     // even once a city is set — otherwise "Pilih Kota" reads as a dead end.
@@ -177,7 +179,7 @@ class HomeScreen extends ConsumerWidget {
                         const SizedBox(width: 6),
                         Flexible(
                           child: Text(
-                            settings.cityName ?? 'Pilih Kota',
+                            settings.cityName ?? context.l10n.homeDefaultCityLabel,
                             style: Theme.of(context).textTheme.titleMedium
                                 ?.copyWith(fontWeight: FontWeight.bold),
                             overflow: TextOverflow.ellipsis,
@@ -278,13 +280,13 @@ class HomeScreen extends ConsumerWidget {
           Icon(Icons.cloud_off_rounded, size: 64, color: colorScheme.error),
           const SizedBox(height: 16),
           Text(
-            'Gagal memuat jadwal solat',
+            context.l10n.homeErrorTitle,
             style: Theme.of(context).textTheme.titleMedium,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           Text(
-            'Periksa koneksi internet lalu coba lagi.',
+            context.l10n.homeErrorBody,
             style: Theme.of(
               context,
             ).textTheme.bodyMedium?.copyWith(color: colorScheme.onSurfaceVariant),
@@ -294,7 +296,7 @@ class HomeScreen extends ConsumerWidget {
           FilledButton.icon(
             onPressed: notifier.refresh,
             icon: const Icon(Icons.refresh_rounded),
-            label: const Text('Coba lagi'),
+            label: Text(context.l10n.commonRetry),
           ),
         ],
       ),
@@ -315,13 +317,13 @@ class HomeScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 16),
           Text(
-            'Jadwal solat tidak tersedia',
+            context.l10n.homeEmptyTitle,
             style: Theme.of(context).textTheme.titleMedium,
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
           Text(
-            'Pilih kota terlebih dahulu supaya jadwal bisa dimuat.',
+            context.l10n.homeEmptyBody,
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurfaceVariant,
             ),
@@ -332,7 +334,7 @@ class HomeScreen extends ConsumerWidget {
           FilledButton.icon(
             onPressed: () => context.push(AppRoutes.settings),
             icon: const Icon(Icons.location_on_outlined),
-            label: const Text('Pilih kota'),
+            label: Text(context.l10n.homeChooseCity),
           ),
         ],
       ),
@@ -355,7 +357,6 @@ class HomeScreen extends ConsumerWidget {
 
     // Determine next prayer for highlighting
     final nextPrayerState = ref.watch(prayerTimesProvider);
-    final nextPrayerNameStr = nextPrayerState.nextPrayerName;
 
     return prayers.map((item) {
       final name = item.$1;
@@ -364,8 +365,8 @@ class HomeScreen extends ConsumerWidget {
       // Get existing status if any
       final prayerRecord = prayersState.getPrayerByName(name);
       final isNext =
-          name.toString().split('.').last.toLowerCase() ==
-          nextPrayerNameStr?.toLowerCase();
+          !nextPrayerState.nextPrayerIsTomorrow &&
+          name == nextPrayerState.nextPrayer;
 
       return PrayerCard(
         prayerName: name,
@@ -382,21 +383,16 @@ class HomeScreen extends ConsumerWidget {
   void _handleTimerTap(BuildContext context, WidgetRef ref) {
     final state = ref.read(prayerTimesProvider);
     final prayerTime = state.prayerTime;
-    final nextName = state.nextPrayerName;
-    // "Subuh (besok)" berarti semua solat hari ini sudah lewat waktunya —
+    final next = state.nextPrayer;
+    // nextPrayerIsTomorrow berarti semua solat hari ini sudah lewat waktunya —
     // belum ada yang bisa dicatat untuk esok.
-    if (prayerTime == null || nextName == null || nextName.contains('besok')) {
+    if (prayerTime == null || next == null || state.nextPrayerIsTomorrow) {
       return;
     }
 
-    final match = PrayerName.values
-        .where((p) => p.displayName == nextName)
-        .firstOrNull;
-    if (match == null) return;
-
-    final time = _timeForPrayer(prayerTime, match);
-    final existingRecord = ref.read(todayPrayersProvider).getPrayerByName(match);
-    _handlePrayerTap(context, ref, match, time, existingRecord);
+    final time = _timeForPrayer(prayerTime, next);
+    final existingRecord = ref.read(todayPrayersProvider).getPrayerByName(next);
+    _handlePrayerTap(context, ref, next, time, existingRecord);
   }
 
   String _timeForPrayer(PrayerTime prayerTime, PrayerName name) {
@@ -458,10 +454,12 @@ class HomeScreen extends ConsumerWidget {
 
     messenger.showSnackBar(
       SnackBar(
-        content: Text('Catatan ${name.displayName} dihapus.'),
+        content: Text(
+          context.l10n.homeDeletedSnackbar(name.label(context.l10n)),
+        ),
         persist: false,
         action: SnackBarAction(
-          label: 'Urungkan',
+          label: context.l10n.commonUndo,
           onPressed: () => notifier.restorePrayer(record),
         ),
       ),

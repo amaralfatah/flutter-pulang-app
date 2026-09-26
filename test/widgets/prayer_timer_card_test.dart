@@ -6,6 +6,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 import 'package:pulang/app/theme/app_colors.dart';
 import 'package:pulang/app/theme/app_theme.dart';
+import 'package:pulang/l10n/app_localizations.dart';
+import 'package:pulang/models/models.dart';
 import 'package:pulang/providers/prayer_times_provider.dart';
 import 'package:pulang/widgets/home/prayer_timer_card.dart';
 
@@ -94,7 +96,8 @@ void main() {
   group('tata letak', () {
     // Nama solat terpanjang digabung countdown terlebar = kasus terburuk.
     const worstCase = PrayerTimesState(
-      nextPrayerName: 'Maghrib (besok)',
+      nextPrayer: PrayerName.maghrib,
+      nextPrayerIsTomorrow: true,
       nextPrayerTime: '17:58',
       remainingTime: Duration(hours: 23, minutes: 59),
     );
@@ -113,6 +116,9 @@ void main() {
           ],
           child: MaterialApp(
             theme: AppTheme.dark,
+            locale: const Locale('id'),
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
             home: const Scaffold(body: PrayerTimerCard()),
           ),
         ),
@@ -187,6 +193,9 @@ void main() {
                 ],
                 child: MaterialApp(
                   theme: theme,
+                  locale: const Locale('id'),
+                  supportedLocales: AppLocalizations.supportedLocales,
+                  localizationsDelegates: AppLocalizations.localizationsDelegates,
                   home: MediaQuery(
                     data: MediaQueryData(textScaler: TextScaler.linear(scale)),
                     child: const Scaffold(body: PrayerTimerCard()),

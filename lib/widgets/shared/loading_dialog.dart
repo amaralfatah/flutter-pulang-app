@@ -11,7 +11,7 @@ class LoadingDialog {
   /// Show a modal, non-dismissible loading dialog with a [message].
   ///
   /// Uses the root navigator so it sits above bottom sheets and other dialogs.
-  static void show(BuildContext context, {String message = 'Memproses...'}) {
+  static void show(BuildContext context, {required String message}) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -70,7 +70,7 @@ class LoadingDialog {
   static Future<T> run<T>(
     BuildContext context, {
     required Future<T> Function() task,
-    String message = 'Memproses...',
+    required String message,
   }) async {
     show(context, message: message);
     try {

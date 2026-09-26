@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../app/extensions/context_extensions.dart';
+import '../../l10n/app_localizations.dart';
+import '../../models/models.dart';
 import '../../providers/providers.dart';
 import '../patterns/pattern_painters.dart';
 
@@ -87,7 +90,7 @@ class PrayerTimerCard extends ConsumerWidget {
             const SizedBox(width: 12),
             Expanded(
               child: Text(
-                'Gagal memuat jadwal',
+                context.l10n.homeTimerLoadError,
                 style: Theme.of(
                   context,
                 ).textTheme.titleMedium?.copyWith(color: onPrimary),
@@ -103,10 +106,10 @@ class PrayerTimerCard extends ConsumerWidget {
     // Kapital kecil dibaca huruf-per-huruf oleh sebagian pembaca layar, jadi
     // labelnya diucapkan ulang dalam bentuk normal.
     final label = Semantics(
-      label: 'Solat berikutnya',
+      label: context.l10n.homeNextPrayerLabel,
       child: ExcludeSemantics(
         child: Text(
-          'SOLAT BERIKUTNYA',
+          context.l10n.homeNextPrayerLabel.toUpperCase(),
           style: textTheme.labelSmall?.copyWith(
             color: onPrimary.withValues(alpha: _secondaryAlpha),
             letterSpacing: 0.8,
@@ -138,7 +141,7 @@ class PrayerTimerCard extends ConsumerWidget {
         children: [
           label,
           const SizedBox(height: 4),
-          _buildPrayerName(context, state.nextPrayerName),
+          _buildPrayerName(context, state.nextPrayer, state.nextPrayerIsTomorrow),
           const SizedBox(height: 4),
           time,
           const SizedBox(height: 4),
@@ -174,7 +177,11 @@ class PrayerTimerCard extends ConsumerWidget {
           textBaseline: TextBaseline.alphabetic,
           children: [
             Expanded(
-              child: _buildPrayerName(context, state.nextPrayerName),
+              child: _buildPrayerName(
+                context,
+                state.nextPrayer,
+                state.nextPrayerIsTomorrow,
+              ),
             ),
             const SizedBox(width: 12),
 
@@ -191,30 +198,32 @@ class PrayerTimerCard extends ConsumerWidget {
     );
   }
 
-  /// Nama solat, dengan keterangan "(besok)" bila ada.
+  /// Nama solat, dengan keterangan "(besok)" bila [isTomorrow].
   ///
   /// Jam solat sengaja tidak ikut ditampilkan di sini: angka itu sudah muncul
   /// pada baris solat yang sama di daftar tepat di bawah kartu. Menggabungnya
   /// ke baris ini membuat teks tidak muat di layar sempit dan berakhir
   /// terpotong jadi elipsis.
-  Widget _buildPrayerName(BuildContext context, String? fullName) {
+  Widget _buildPrayerName(
+    BuildContext context,
+    PrayerName? prayer,
+    bool isTomorrow,
+  ) {
     final textTheme = Theme.of(context).textTheme;
     final onPrimary = Theme.of(context).colorScheme.onPrimaryContainer;
-
-    final name = fullName ?? '-';
-    final suffixStart = name.indexOf(' (');
+    final name = prayer?.label(context.l10n) ?? '-';
 
     return Text.rich(
       TextSpan(
-        text: suffixStart == -1 ? name : name.substring(0, suffixStart),
+        text: name,
         style: textTheme.titleLarge?.copyWith(
           color: onPrimary,
           fontWeight: FontWeight.bold,
         ),
         children: [
-          if (suffixStart != -1)
+          if (isTomorrow)
             TextSpan(
-              text: name.substring(suffixStart),
+              text: ' ${context.l10n.homeTomorrowSuffix}',
               style: textTheme.bodyMedium?.copyWith(
                 color: onPrimary.withValues(alpha: _secondaryAlpha),
                 fontWeight: FontWeight.w500,
@@ -241,7 +250,7 @@ class PrayerTimerCard extends ConsumerWidget {
     // ini sudah lewat" tetap punya hitungan mundur ke Subuh besok.
     if (duration == null) {
       return Text(
-        'Waktu tidak\ndiketahui',
+        context.l10n.homeCountdownUnknown,
         textAlign: TextAlign.end,
         style: textTheme.labelMedium?.copyWith(
           color: onPrimary.withValues(alpha: _secondaryAlpha),
@@ -251,18 +260,21 @@ class PrayerTimerCard extends ConsumerWidget {
 
     final hours = duration.inHours;
     final minutes = duration.inMinutes % 60;
+    final l10n = context.l10n;
 
     final String value;
     if (hours > 0) {
-      value = '${hours}j ${minutes.toString().padLeft(2, '0')}m';
+      value =
+          '$hours${l10n.homeUnitHourShort} '
+          '${minutes.toString().padLeft(2, '0')}${l10n.homeUnitMinuteShort}';
     } else if (minutes > 0) {
-      value = '${minutes}m';
+      value = '$minutes${l10n.homeUnitMinuteShort}';
     } else {
-      value = '<1m';
+      value = '<1${l10n.homeUnitMinuteShort}';
     }
 
     return Semantics(
-      label: 'Sisa waktu ${_spokenDuration(hours, minutes)}',
+      label: _spokenDuration(l10n, hours, minutes),
       excludeSemantics: true,
       // Angka tabular: nilainya berubah tiap menit, dan dengan lebar digit
       // proporsional tepi blok ini akan bergeser-geser tiap pergantian.
@@ -282,9 +294,9 @@ class PrayerTimerCard extends ConsumerWidget {
   }
 
   /// Bentuk panjang untuk pembaca layar — "6j 05m" tidak terbaca wajar.
-  String _spokenDuration(int hours, int minutes) {
-    if (hours > 0) return '$hours jam $minutes menit lagi';
-    if (minutes > 0) return '$minutes menit lagi';
-    return 'sebentar lagi';
+  String _spokenDuration(AppLocalizations l10n, int hours, int minutes) {
+    if (hours > 0) return l10n.homeCountdownSpokenHm(hours, minutes);
+    if (minutes > 0) return l10n.homeCountdownSpokenM(minutes);
+    return l10n.homeCountdownSoon;
   }
 }

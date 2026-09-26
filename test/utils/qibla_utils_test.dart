@@ -1,4 +1,6 @@
+import 'package:flutter/widgets.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pulang/l10n/app_localizations.dart';
 import 'package:pulang/utils/qibla_utils.dart';
 
 void main() {
@@ -58,13 +60,18 @@ void main() {
   });
 
   group('cardinalName', () {
-    test('expands known abbreviations', () {
-      expect(QiblaUtils.cardinalName('U'), 'Utara');
-      expect(QiblaUtils.cardinalName('BL'), 'Barat Laut');
+    final id = lookupAppLocalizations(const Locale('id'));
+    final en = lookupAppLocalizations(const Locale('en'));
+
+    test('expands known abbreviations per locale', () {
+      expect(QiblaUtils.cardinalName('U', id), 'Utara');
+      expect(QiblaUtils.cardinalName('BL', id), 'Barat Laut');
+      expect(QiblaUtils.cardinalName('U', en), 'North');
+      expect(QiblaUtils.cardinalName('BL', en), 'Northwest');
     });
 
     test('returns unknown abbreviations unchanged', () {
-      expect(QiblaUtils.cardinalName('X'), 'X');
+      expect(QiblaUtils.cardinalName('X', id), 'X');
     });
   });
 }

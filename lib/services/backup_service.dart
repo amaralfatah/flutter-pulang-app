@@ -210,7 +210,7 @@ class BackupService {
     await driveApi.files.create(driveFile, uploadMedia: media);
 
     // 5. Update local record — stored as ISO 8601 so the UI can format it
-    // consistently with every other date in the app (id_ID locale).
+    // consistently with every other date in the app, in the active locale.
     await _preferencesService.setLastBackupDate(
       DateTime.now().toIso8601String(),
     );

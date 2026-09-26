@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 
 import '../../app/extensions/color_scheme_extensions.dart';
+import '../../app/extensions/context_extensions.dart';
+import '../../l10n/app_localizations.dart';
 import '../../models/models.dart';
 
 /// Ikon untuk tiap waktu solat. Dipakai bersama oleh kartu solat dan layar
@@ -98,14 +100,14 @@ class PrayerCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      prayerName.displayName,
+                      prayerName.label(context.l10n),
                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      subtitle ?? _getStatusText(),
+                      subtitle ?? _getStatusText(context.l10n),
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
@@ -119,7 +121,9 @@ class PrayerCard extends StatelessWidget {
               // by colour/icon alone (a11y: color-not-only).
               if (status != null)
                 Semantics(
-                  label: 'Status: ${_getStatusText()}',
+                  label: context.l10n.prayerCardStatusSemantics(
+                    _getStatusText(context.l10n),
+                  ),
                   child: Container(
                     width: 44,
                     height: 44,
@@ -138,16 +142,16 @@ class PrayerCard extends StatelessWidget {
   }
 
   /// Get status text based on prayer status
-  String _getStatusText() {
+  String _getStatusText(AppLocalizations l10n) {
     switch (status) {
       case PrayerStatus.onTime:
-        return 'Tepat Waktu';
+        return l10n.checkinOnTimeTitle;
       case PrayerStatus.late:
         return 'Qadha';
       case PrayerStatus.missed:
-        return 'Terlewat';
+        return l10n.checkinMissedTitle;
       case null:
-        return 'Belum dicatat';
+        return l10n.prayerCardNotRecorded;
     }
   }
 }

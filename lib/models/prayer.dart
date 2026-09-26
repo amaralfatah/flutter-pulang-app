@@ -1,3 +1,5 @@
+import '../l10n/app_localizations.dart';
+
 /// Prayer status enum
 enum PrayerStatus {
   /// Prayer completed on time
@@ -44,21 +46,8 @@ extension PrayerStatusExtension on PrayerStatus {
 extension PrayerNameExtension on PrayerName {
   String get value => name;
 
-  /// Nama yang ditampilkan ke user.
-  String get displayName {
-    switch (this) {
-      case PrayerName.subuh:
-        return 'Subuh';
-      case PrayerName.dzuhur:
-        return 'Dzuhur';
-      case PrayerName.ashar:
-        return 'Ashar';
-      case PrayerName.maghrib:
-        return 'Maghrib';
-      case PrayerName.isya:
-        return 'Isya';
-    }
-  }
+  /// Nama yang ditampilkan ke user, sesuai bahasa aktif.
+  String label(AppLocalizations l10n) => l10n.prayerName(name);
 
   static PrayerName fromString(String value) {
     return PrayerName.values.firstWhere(

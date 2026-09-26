@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../app/extensions/context_extensions.dart';
 import '../../models/models.dart';
 import 'check_in_option.dart';
 
@@ -68,7 +69,7 @@ class CheckInBottomSheet extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isEdit = currentStatus != null;
-    final displayName = _getDisplayName(prayerName);
+    final displayName = prayerName.label(context.l10n);
     final colorScheme = Theme.of(context).colorScheme;
 
     return SafeArea(
@@ -88,7 +89,9 @@ class CheckInBottomSheet extends StatelessWidget {
                 const SizedBox(width: 48),
                 Expanded(
                   child: Text(
-                    isEdit ? 'Edit $displayName' : 'Catat $displayName',
+                    isEdit
+                        ? context.l10n.checkinEditTitle(displayName)
+                        : context.l10n.checkinRecordTitle(displayName),
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.w600,
@@ -104,7 +107,7 @@ class CheckInBottomSheet extends StatelessWidget {
                             Icons.delete_outline_rounded,
                             color: colorScheme.onSurfaceVariant,
                           ),
-                          tooltip: 'Hapus catatan',
+                          tooltip: context.l10n.checkinDeleteTooltip,
                         )
                       : null,
                 ),
@@ -128,8 +131,8 @@ class CheckInBottomSheet extends StatelessWidget {
             CheckInOption(
               icon: Icons.check_circle_rounded,
               type: CheckInType.onTime,
-              title: 'Tepat Waktu',
-              subtitle: 'Solat dilakukan di awal waktu',
+              title: context.l10n.checkinOnTimeTitle,
+              subtitle: context.l10n.checkinOnTimeSubtitle,
               isSelected: currentStatus == PrayerStatus.onTime,
               onTap: () => onStatusSelected(PrayerStatus.onTime),
             ),
@@ -139,8 +142,8 @@ class CheckInBottomSheet extends StatelessWidget {
             CheckInOption(
               icon: Icons.schedule_rounded,
               type: CheckInType.late,
-              title: 'Qadha / Terlambat',
-              subtitle: 'Solat dilakukan di luar waktu',
+              title: context.l10n.checkinLateTitle,
+              subtitle: context.l10n.checkinLateSubtitle,
               isSelected: currentStatus == PrayerStatus.late,
               onTap: () => onStatusSelected(PrayerStatus.late),
             ),
@@ -150,8 +153,8 @@ class CheckInBottomSheet extends StatelessWidget {
             CheckInOption(
               icon: Icons.cancel_rounded,
               type: CheckInType.missed,
-              title: 'Terlewat',
-              subtitle: 'Tidak solat',
+              title: context.l10n.checkinMissedTitle,
+              subtitle: context.l10n.checkinMissedSubtitle,
               isSelected: currentStatus == PrayerStatus.missed,
               onTap: () => onStatusSelected(PrayerStatus.missed),
             ),
@@ -162,7 +165,7 @@ class CheckInBottomSheet extends StatelessWidget {
             TextButton(
               onPressed: () => Navigator.pop(context),
               child: Text(
-                'Batal',
+                context.l10n.commonCancel,
                 style: Theme.of(context).textTheme.labelLarge?.copyWith(
                   color: colorScheme.onSurfaceVariant,
                 ),
@@ -172,20 +175,5 @@ class CheckInBottomSheet extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _getDisplayName(PrayerName name) {
-    switch (name) {
-      case PrayerName.subuh:
-        return 'Subuh';
-      case PrayerName.dzuhur:
-        return 'Dzuhur';
-      case PrayerName.ashar:
-        return 'Ashar';
-      case PrayerName.maghrib:
-        return 'Maghrib';
-      case PrayerName.isya:
-        return 'Isya';
-    }
   }
 }
