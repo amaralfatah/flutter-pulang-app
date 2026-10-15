@@ -9,7 +9,7 @@ class AppLocalizationsEn extends AppLocalizations {
   AppLocalizationsEn([String locale = 'en']) : super(locale);
 
   @override
-  String get appTitle => 'Pulang - Prayer Tracker';
+  String get appTitle => 'Mulih - Prayer Tracker';
 
   @override
   String prayerName(String name) {
@@ -43,7 +43,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commonUndo => 'Undo';
 
   @override
-  String get onboardingWelcomeTitle => 'Welcome to Pulang';
+  String get onboardingWelcomeTitle => 'Welcome to Mulih';
 
   @override
   String get onboardingWelcomeBody =>
@@ -72,7 +72,7 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get onboardingNotifBody =>
-      'Pulang notifies you right when a prayer time begins. You can change this anytime in Settings.';
+      'Mulih notifies you right when a prayer time begins. You can change this anytime in Settings.';
 
   @override
   String get onboardingNotifDenied =>

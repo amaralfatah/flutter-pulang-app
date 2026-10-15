@@ -9,14 +9,14 @@ import 'router.dart';
 import 'theme/app_theme.dart';
 
 /// Main application widget wrapped with Riverpod
-class PulangApp extends ConsumerStatefulWidget {
-  const PulangApp({super.key});
+class MulihApp extends ConsumerStatefulWidget {
+  const MulihApp({super.key});
 
   @override
-  ConsumerState<PulangApp> createState() => _PulangAppState();
+  ConsumerState<MulihApp> createState() => _MulihAppState();
 }
 
-class _PulangAppState extends ConsumerState<PulangApp> {
+class _MulihAppState extends ConsumerState<MulihApp> {
   @override
   void initState() {
     super.initState();
