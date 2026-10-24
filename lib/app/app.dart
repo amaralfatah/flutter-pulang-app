@@ -9,14 +9,14 @@ import 'router.dart';
 import 'theme/app_theme.dart';
 
 /// Main application widget wrapped with Riverpod
-class MulihApp extends ConsumerStatefulWidget {
-  const MulihApp({super.key});
+class SarariaPrayerApp extends ConsumerStatefulWidget {
+  const SarariaPrayerApp({super.key});
 
   @override
-  ConsumerState<MulihApp> createState() => _MulihAppState();
+  ConsumerState<SarariaPrayerApp> createState() => _SarariaPrayerAppState();
 }
 
-class _MulihAppState extends ConsumerState<MulihApp> {
+class _SarariaPrayerAppState extends ConsumerState<SarariaPrayerApp> {
   @override
   void initState() {
     super.initState();

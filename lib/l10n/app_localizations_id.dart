@@ -9,7 +9,7 @@ class AppLocalizationsId extends AppLocalizations {
   AppLocalizationsId([String locale = 'id']) : super(locale);
 
   @override
-  String get appTitle => 'Mulih - Presensi Solat';
+  String get appTitle => 'Sararia Prayer';
 
   @override
   String prayerName(String name) {
@@ -43,7 +43,7 @@ class AppLocalizationsId extends AppLocalizations {
   String get commonUndo => 'Urungkan';
 
   @override
-  String get onboardingWelcomeTitle => 'Selamat datang di Mulih';
+  String get onboardingWelcomeTitle => 'Selamat datang di Sararia Prayer';
 
   @override
   String get onboardingWelcomeBody =>
@@ -72,7 +72,7 @@ class AppLocalizationsId extends AppLocalizations {
 
   @override
   String get onboardingNotifBody =>
-      'Mulih mengingatkanmu tepat saat masuk waktu solat. Kamu bisa mengatur ulang ini kapan saja di Pengaturan.';
+      'Sararia Prayer mengingatkanmu tepat saat masuk waktu solat. Kamu bisa mengatur ulang ini kapan saja di Pengaturan.';
 
   @override
   String get onboardingNotifDenied =>

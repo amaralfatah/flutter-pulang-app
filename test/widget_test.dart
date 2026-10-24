@@ -18,7 +18,7 @@ void main() {
 
   testWidgets('App should build without errors', (WidgetTester tester) async {
     // Build our app and trigger a frame.
-    await tester.pumpWidget(const ProviderScope(child: MulihApp()));
+    await tester.pumpWidget(const ProviderScope(child: SarariaPrayerApp()));
 
     // Verify the app renders something
     expect(find.byType(MaterialApp), findsOneWidget);

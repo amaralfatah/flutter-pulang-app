@@ -22,5 +22,5 @@ void main() async {
   app_router.onboardingCompleted = await preferencesService
       .isOnboardingCompleted();
 
-  runApp(const ProviderScope(child: MulihApp()));
+  runApp(const ProviderScope(child: SarariaPrayerApp()));
 }

@@ -28,7 +28,7 @@ class HomeScreen extends ConsumerWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Mulih'),
+        title: const Text('Sararia Prayer'),
         // Kiblat dan Pengaturan tinggal di sini, bukan di bottom nav: keduanya
         // dibuka sesekali, jadi tidak layak menahan slot navigasi utama.
         actions: [

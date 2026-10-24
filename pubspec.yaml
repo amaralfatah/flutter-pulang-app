@@ -1,5 +1,5 @@
 name: pulang
-description: "Mulih — daily prayer tracker with qadha records, prayer times, and qibla direction."
+description: "Sararia Prayer — daily prayer tracker with qadha records, prayer times, and qibla direction."
 # The following line prevents the package from being accidentally published to
 # pub.dev using `flutter pub publish`. This is preferred for private packages.
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
@@ -16,7 +16,7 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 1.0.1+2
+version: 1.1.0+3
 
 environment:
   sdk: ^3.10.3
@@ -69,9 +69,10 @@ dev_dependencies:
   # SQLite in-memory untuk menguji perhitungan buku besar qadha di desktop.
   sqflite_common_ffi: ^2.3.4
 
-# App launcher icon. app_icon*.png are derived from the Caang Labs icon family
-# (next-caanglabs: `npm run icons`, source public/app-icons/mulih.svg, copied to
-# assets/icon/logo-mulih.svg). Regenerate after replacing them: dart run flutter_launcher_icons
+# App launcher icon, from the Sararia icon family (sararia-logo/apps/prayer, see FAMILY.md):
+# app_icon = png icon-square (rendered at 1024), background = tile, foreground = glyph-depth,
+# monochrome = glyph-white, dark = glyph-depth-dark, tinted = glyph-depth.
+# Regenerate after replacing them: dart run flutter_launcher_icons
 flutter_launcher_icons:
   android: "ic_launcher"
   ios: true
@@ -80,6 +81,10 @@ flutter_launcher_icons:
   min_sdk_android: 21
   adaptive_icon_background: "assets/icon/app_icon_background.png"
   adaptive_icon_foreground: "assets/icon/app_icon_foreground.png"
+  adaptive_icon_monochrome: "assets/icon/app_icon_monochrome.png"
+  image_path_ios_dark_transparent: "assets/icon/app_icon_dark.png"
+  image_path_ios_tinted_grayscale: "assets/icon/app_icon_tinted.png"
+  desaturate_tinted_to_grayscale_ios: true
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

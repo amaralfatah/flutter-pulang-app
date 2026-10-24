@@ -101,7 +101,7 @@ abstract class AppLocalizations {
   /// No description provided for @appTitle.
   ///
   /// In id, this message translates to:
-  /// **'Mulih - Presensi Solat'**
+  /// **'Sararia Prayer'**
   String get appTitle;
 
   /// No description provided for @prayerName.
@@ -149,7 +149,7 @@ abstract class AppLocalizations {
   /// No description provided for @onboardingWelcomeTitle.
   ///
   /// In id, this message translates to:
-  /// **'Selamat datang di Mulih'**
+  /// **'Selamat datang di Sararia Prayer'**
   String get onboardingWelcomeTitle;
 
   /// No description provided for @onboardingWelcomeBody.
@@ -197,7 +197,7 @@ abstract class AppLocalizations {
   /// No description provided for @onboardingNotifBody.
   ///
   /// In id, this message translates to:
-  /// **'Mulih mengingatkanmu tepat saat masuk waktu solat. Kamu bisa mengatur ulang ini kapan saja di Pengaturan.'**
+  /// **'Sararia Prayer mengingatkanmu tepat saat masuk waktu solat. Kamu bisa mengatur ulang ini kapan saja di Pengaturan.'**
   String get onboardingNotifBody;
 
   /// No description provided for @onboardingNotifDenied.
